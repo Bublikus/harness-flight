@@ -10,7 +10,7 @@ export function waypointPos(i: number): [number, number, number] {
 
 const POST = 5.4
 
-export function Beacons({ current }: { current: number }) {
+export function Beacons({ current, flying }: { current: number; flying: boolean }) {
   return (
     <group>
       {SLIDES.map((s, i) => {
@@ -38,9 +38,11 @@ export function Beacons({ current }: { current: number }) {
                 emissiveIntensity={on ? 0.7 : 0}
               />
             </mesh>
-            <Html position={[0, POST + 1.35, 0]} center distanceFactor={28}>
-              <div className="beacon-label">{String(i + 1).padStart(2, '0')}</div>
-            </Html>
+            {!flying && (
+              <Html position={[0, POST + 1.35, 0]} center distanceFactor={28}>
+                <div className="beacon-label">{String(i + 1).padStart(2, '0')}</div>
+              </Html>
+            )}
           </group>
         )
       })}

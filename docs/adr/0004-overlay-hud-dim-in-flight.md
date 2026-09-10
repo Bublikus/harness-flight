@@ -1,6 +1,6 @@
 # ADR-0004: Overlay HUD; dim the sign while flying
 
-- Status: Accepted
+- Status: Superseded by ADR-0005
 - Date: 2026-09-11
 - Deciders: this session
 

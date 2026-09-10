@@ -1,16 +1,24 @@
 import { Canvas } from '@react-three/fiber'
 import { Sky } from '@react-three/drei'
+import { SLIDES } from '../slides'
 import { Terrain } from './Terrain'
 import { Beacons } from './Beacons'
 import { Flight } from './Flight'
+import { WorldSign } from './WorldSign'
 
 export function World({
   index,
+  parked,
   flying,
+  started,
+  remaining,
   onArrived,
 }: {
   index: number
+  parked: number
   flying: boolean
+  started: boolean
+  remaining: number
   onArrived: () => void
 }) {
   return (
@@ -31,7 +39,25 @@ export function World({
         mieDirectionalG={0.7}
       />
       <Terrain />
-      <Beacons current={index} />
+      <Beacons current={index} flying={flying} />
+      {[...new Set([parked, index, Math.max(0, parked - 1)])].map((i) => {
+        const pose =
+          started && !flying && i === parked
+            ? 'read'
+            : flying && i === parked
+              ? 'depart'
+              : flying && i === index
+                ? 'arrive'
+                : 'dock'
+        return (
+          <WorldSign
+            key={i}
+            i={i}
+            pose={pose}
+            remaining={i === index ? remaining : SLIDES[i].durationSec}
+          />
+        )
+      })}
       <Flight index={index} flying={flying} onArrived={onArrived} />
     </Canvas>
   )

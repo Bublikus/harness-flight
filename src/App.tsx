@@ -7,6 +7,7 @@ import './index.css'
 export default function App() {
   const [started, setStarted] = useState(false)
   const [index, setIndex] = useState(0)
+  const [parked, setParked] = useState(0)
   const [flying, setFlying] = useState(false)
   const [paused, setPaused] = useState(false)
   const [remaining, setRemaining] = useState(SLIDES[0].durationSec)
@@ -49,7 +50,17 @@ export default function App() {
 
   return (
     <div className="app">
-      <World index={index} flying={flying} onArrived={() => setFlying(false)} />
+      <World
+        index={index}
+        parked={parked}
+        flying={flying}
+        started={started}
+        remaining={remaining}
+        onArrived={() => {
+          setFlying(false)
+          setParked(index)
+        }}
+      />
       {started ? (
         <Hud
           index={index}

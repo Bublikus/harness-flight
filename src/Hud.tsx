@@ -1,5 +1,37 @@
-import { SLIDES, TOTAL_SEC } from './slides'
+import { SLIDES, TOTAL_SEC, type Slide } from './slides'
 import { SlideArt } from './SlideArt'
+
+export function SignCard({
+  slide: s,
+  remaining,
+  world,
+}: {
+  slide: Slide
+  remaining: number
+  world?: boolean
+}) {
+  return (
+    <div className={`sign ${world ? 'world-sign' : ''}`}>
+      <SlideArt key={s.id} id={s.id} />
+      <div className="copy">
+        <p className="era">{s.era}</p>
+        <h1>{s.title}</h1>
+        <p className="lead">{s.lead}</p>
+        <ul>
+          {s.points.map((p) => (
+            <li key={p}>{p}</li>
+          ))}
+        </ul>
+        <div className="meter">
+          <div
+            className="meter-fill"
+            style={{ width: `${(remaining / s.durationSec) * 100}%` }}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export function Hud({
   index,
@@ -25,8 +57,8 @@ export function Hud({
   const secs = Math.max(0, Math.floor(talkLeft % 60))
 
   return (
-    <div className={`hud ${flying ? 'hud-dim' : ''}`}>
-      <header className="topbar">
+    <div className={`hud ${flying ? 'hud-away' : ''}`}>
+      <header className="topbar chrome">
         <div className="brand">
           <span className="diamond" />
           HARNESS FLIGHT
@@ -36,50 +68,31 @@ export function Hud({
         </div>
       </header>
 
-      <div className="sign">
-        <SlideArt key={s.id} id={s.id} />
-        <div className="copy">
-          <p className="era">{s.era}</p>
-          <h1>{s.title}</h1>
-          <p className="lead">{s.lead}</p>
-          <ul>
-            {s.points.map((p) => (
-              <li key={p}>{p}</li>
-            ))}
-          </ul>
-          <div className="meter">
-            <div
-              className="meter-fill"
-              style={{ width: `${(remaining / s.durationSec) * 100}%` }}
+      <div className="hud-bottom chrome">
+        <nav className="controls">
+          <button type="button" onClick={onPrev} disabled={index === 0 || flying}>
+            ◀ Prev
+          </button>
+          <button type="button" onClick={onTogglePause} disabled={flying}>
+            {paused ? '▶ Autopilot' : '❚❚ Hold'}
+          </button>
+          <button
+            type="button"
+            className="primary"
+            onClick={onNext}
+            disabled={flying || index === SLIDES.length - 1}
+          >
+            Next waypoint ▶
+          </button>
+        </nav>
+        <div className="dots">
+          {SLIDES.map((sl, i) => (
+            <span
+              key={sl.id}
+              className={i === index ? 'dot on' : i < index ? 'dot done' : 'dot'}
             />
-          </div>
+          ))}
         </div>
-      </div>
-
-      <nav className="controls">
-        <button type="button" onClick={onPrev} disabled={index === 0 || flying}>
-          ◀ Prev
-        </button>
-        <button type="button" onClick={onTogglePause} disabled={flying}>
-          {paused ? '▶ Autopilot' : '❚❚ Hold'}
-        </button>
-        <button
-          type="button"
-          className="primary"
-          onClick={onNext}
-          disabled={flying || index === SLIDES.length - 1}
-        >
-          {flying ? 'In flight…' : 'Next waypoint ▶'}
-        </button>
-      </nav>
-
-      <div className="dots">
-        {SLIDES.map((sl, i) => (
-          <span
-            key={sl.id}
-            className={i === index ? 'dot on' : i < index ? 'dot done' : 'dot'}
-          />
-        ))}
       </div>
     </div>
   )
