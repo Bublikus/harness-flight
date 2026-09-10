@@ -8,10 +8,12 @@ Index of lasting presentation choices. Procedure: `adr` skill.
 | [0002](0002-typed-waypoints-in-slides.md) | Talk content as typed waypoints in `slides.ts` | Accepted |
 | [0003](0003-github-pages-from-main.md) | Deploy the live talk from `main` to GitHub Pages | Accepted |
 | [0004](0004-overlay-hud-dim-in-flight.md) | Overlay HUD; dim the sign while flying | Superseded by ADR-0005 |
-| [0005](0005-in-world-signs-on-posts.md) | In-world signs that dock on waypoint posts | Accepted |
+| [0005](0005-in-world-signs-on-posts.md) | In-world signs that dock on waypoint posts | Superseded by ADR-0006 |
+| [0006](0006-chase-cam-hops-overlay-when-parked.md) | Chase-cam hops; talk copy only when parked | Accepted |
 
 Restore a talk version with `git log --oneline` then `git checkout <commit>`:
 
 - `Add Harness Flight presentation with GitHub Pages deploy` — overlay HUD, dim the sign in flight (ADR-0004).
 - `Record why this talk is a world, not a deck` — same overlay HUD, plus the ADR index.
-- The commit that accepts ADR-0005 — talk copy on in-world signs; HUD chrome fully hides in flight.
+- `Put talk copy on in-world signs that dock on posts` — in-world signs; HUD chrome hides in flight (ADR-0005).
+- `Keep the chase cam on the plane during hops` — overlay card only when parked (ADR-0006).

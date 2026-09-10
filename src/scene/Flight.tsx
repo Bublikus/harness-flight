@@ -56,11 +56,12 @@ export function Flight({
     }
 
     g.getWorldDirection(tmp)
-    behind.set(0, 3.4, -15.5)
+    behind.set(0, 2.6, -11.5)
     behind.applyQuaternion(g.quaternion)
     behind.add(g.position)
-    state.camera.position.lerp(behind, 1 - Math.exp(-dt * 2.4))
-    look.copy(g.position).add(tmp.multiplyScalar(12)).setY(g.position.y + 4.4)
+    state.camera.position.lerp(behind, 1 - Math.exp(-dt * 3.4))
+    look.copy(g.position).addScaledVector(tmp, 6)
+    look.y = g.position.y + 1.15
     state.camera.lookAt(look)
   })
 

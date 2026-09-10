@@ -4,14 +4,12 @@ import { SlideArt } from './SlideArt'
 export function SignCard({
   slide: s,
   remaining,
-  world,
 }: {
   slide: Slide
   remaining: number
-  world?: boolean
 }) {
   return (
-    <div className={`sign ${world ? 'world-sign' : ''}`}>
+    <div className="sign">
       <SlideArt key={s.id} id={s.id} />
       <div className="copy">
         <p className="era">{s.era}</p>
@@ -67,6 +65,12 @@ export function Hud({
           T−{mins}:{String(secs).padStart(2, '0')} · {index + 1}/{SLIDES.length}
         </div>
       </header>
+
+      {!flying && (
+        <div className="hud-card">
+          <SignCard slide={s} remaining={remaining} />
+        </div>
+      )}
 
       <div className="hud-bottom chrome">
         <nav className="controls">

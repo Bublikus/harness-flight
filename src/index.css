@@ -44,6 +44,16 @@ canvas {
   display: none;
 }
 
+.hud-card {
+  position: absolute;
+  top: 52px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
 .topbar,
 .hud-bottom,
 .controls,
@@ -56,12 +66,6 @@ canvas {
   display: flex;
   flex-direction: column;
   gap: 10px;
-}
-
-.sign.world-sign {
-  width: 540px;
-  margin: 0;
-  pointer-events: none;
 }
 
 .topbar {

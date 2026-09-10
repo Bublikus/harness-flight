@@ -1,6 +1,6 @@
 # ADR-0005: In-world signs that dock on waypoint posts
 
-- Status: Accepted
+- Status: Superseded by ADR-0006
 - Date: 2026-09-11
 - Deciders: this session
 
