@@ -44,9 +44,9 @@ export function WorldSign({
         tumbleVel.current.set(-8, 7, 4)
         scVel.current = 2.4
       } else if (pose === 'depart') {
-        vel.current.set((Math.random() - 0.5) * 10, 24, -22)
-        tumbleVel.current.set(12, -16, 10)
-        scVel.current = 0.6
+        vel.current.set((Math.random() - 0.5) * 3, 8, -6)
+        tumbleVel.current.set(5, -8, 4)
+        scVel.current = 0.2
       } else if (pose === 'arrive') {
         vel.current.set((Math.random() - 0.5) * 3, 10, 2)
         tumbleVel.current.set(-3, 4, 2)
@@ -54,12 +54,12 @@ export function WorldSign({
     }
 
     const ty =
-      pose === 'read' ? py + 3.8 : pose === 'arrive' ? py + 1.6 : pose === 'depart' ? py + 5.5 : 6.15
+      pose === 'read' ? py + 3.8 : pose === 'arrive' ? py + 1.6 : pose === 'depart' ? py + 7.2 : 6.15
     const tz =
-      pose === 'read' ? wz + 1.1 : pose === 'arrive' ? wz + 0.8 : pose === 'depart' ? wz - 4 : wz + 0.55
-    const tsc = pose === 'read' ? 1 : pose === 'arrive' ? 0.55 : pose === 'depart' ? 0.72 : 0.2
-    const stiff = pose === 'depart' ? 4.2 : pose === 'read' ? 16 : 12
-    const damp = pose === 'depart' ? 1.8 : pose === 'read' ? 4.6 : 5
+      pose === 'read' ? wz + 1.1 : pose === 'arrive' ? wz + 0.8 : pose === 'depart' ? wz - 1.2 : wz + 0.55
+    const tsc = pose === 'read' ? 1 : pose === 'arrive' ? 0.55 : pose === 'depart' ? 0.85 : 0.2
+    const stiff = pose === 'depart' ? 3.4 : pose === 'read' ? 16 : 12
+    const damp = pose === 'depart' ? 2.2 : pose === 'read' ? 4.6 : 5
 
     vel.current.x += (wx - pos.current.x) * stiff * d
     vel.current.y += (ty - pos.current.y) * stiff * d
