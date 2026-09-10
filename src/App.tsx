@@ -37,11 +37,11 @@ export default function App() {
       if (e.code === 'Space') {
         e.preventDefault()
         if (!started) setStarted(true)
-        else if (!flying) go(index + 1)
+        else go(index + 1)
       }
-      if (e.code === 'KeyP') setPaused((p) => !p)
-      if (e.code === 'ArrowRight' && !flying) go(index + 1)
-      if (e.code === 'ArrowLeft' && !flying) go(index - 1)
+      if (e.code === 'KeyP' && !flying) setPaused((p) => !p)
+      if (e.code === 'ArrowRight') go(index + 1)
+      if (e.code === 'ArrowLeft') go(index - 1)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

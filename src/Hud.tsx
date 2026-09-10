@@ -55,7 +55,7 @@ export function Hud({
   const secs = Math.max(0, Math.floor(talkLeft % 60))
 
   return (
-    <div className={`hud ${flying ? 'hud-away' : ''}`}>
+    <div className="hud">
       <header className="topbar chrome">
         <div className="brand">
           <span className="diamond" />
@@ -74,7 +74,7 @@ export function Hud({
 
       <div className="hud-bottom chrome">
         <nav className="controls">
-          <button type="button" onClick={onPrev} disabled={index === 0 || flying}>
+          <button type="button" onClick={onPrev} disabled={index === 0}>
             ◀ Prev
           </button>
           <button type="button" onClick={onTogglePause} disabled={flying}>
@@ -84,7 +84,7 @@ export function Hud({
             type="button"
             className="primary"
             onClick={onNext}
-            disabled={flying || index === SLIDES.length - 1}
+            disabled={index === SLIDES.length - 1}
           >
             Next waypoint ▶
           </button>
@@ -117,7 +117,7 @@ export function TitleScreen({ onStart }: { onStart: () => void }) {
       <button type="button" className="primary big" onClick={onStart}>
         Take off
       </button>
-      <p className="hint">Space = next waypoint · P = pause autopilot</p>
+      <p className="hint">Space = next waypoint · ← = turn back · P = pause</p>
     </div>
   )
 }

@@ -10,6 +10,7 @@ Index of lasting presentation choices. Procedure: `adr` skill.
 | [0004](0004-overlay-hud-dim-in-flight.md) | Overlay HUD; dim the sign while flying | Superseded by ADR-0005 |
 | [0005](0005-in-world-signs-on-posts.md) | In-world signs that dock on waypoint posts | Superseded by ADR-0006 |
 | [0006](0006-chase-cam-hops-overlay-when-parked.md) | Chase-cam hops; talk copy only when parked | Accepted |
+| [0007](0007-interruptible-uturn-hops.md) | Interruptible hops with a banked U-turn | Accepted |
 
 Restore a talk version with `git log --oneline` then `git checkout <commit>`:
 
@@ -17,3 +18,4 @@ Restore a talk version with `git log --oneline` then `git checkout <commit>`:
 - `Record why this talk is a world, not a deck` — same overlay HUD, plus the ADR index.
 - `Put talk copy on in-world signs that dock on posts` — in-world signs; HUD chrome hides in flight (ADR-0005).
 - `Keep the chase cam on the plane during hops` — overlay card only when parked (ADR-0006).
+- `Make waypoint hops interruptible and smooth` — banked U-turns, approach braking, seamless docking (ADR-0007).
