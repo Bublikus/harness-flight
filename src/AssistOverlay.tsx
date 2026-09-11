@@ -34,6 +34,7 @@ function load(): Saved {
   let home = { x: vw - 440 - 24, y: 72 }
   let views: Record<string, View> = {}
   let dock: Dock = 'right'
+  let from: { x: number; y: number } | undefined
   try {
     const raw = localStorage.getItem(KEY)
     if (raw) {
@@ -47,12 +48,13 @@ function load(): Saved {
         }
         views = s.views ?? {}
         dock = s.dock ?? 'right'
+        if (Number.isFinite(s.x) && Number.isFinite(s.y)) from = { x: s.x, y: s.y }
       }
     }
   } catch {
     /* keep defaults */
   }
-  return { ...park(dock, w, h), w, h, dock, home, views }
+  return { ...park(dock, w, h, from), w, h, dock, home, views }
 }
 
 function save(s: Saved) {
@@ -70,13 +72,38 @@ function save(s: Saved) {
   )
 }
 
-function park(dock: Dock, w: number, h: number) {
+function park(dock: Dock, w: number, h: number, from?: { x: number; y: number }) {
   const vw = window.innerWidth
   const vh = window.innerHeight
-  if (dock === 'left') return { x: -w, y: clamp(vh / 2 - h / 2, 8, vh - h - 8) }
-  if (dock === 'right') return { x: vw, y: clamp(vh / 2 - h / 2, 8, vh - h - 8) }
-  if (dock === 'top') return { x: clamp(vw / 2 - w / 2, 8, vw - w - 8), y: -h }
-  return { x: clamp(vw / 2 - w / 2, 8, vw - w - 8), y: vh }
+  const cy = from ? clamp(from.y, 8, vh - h - 8) : clamp(vh / 2 - h / 2, 8, vh - h - 8)
+  const cx = from ? clamp(from.x, 8, vw - w - 8) : clamp(vw / 2 - w / 2, 8, vw - w - 8)
+  if (dock === 'left') return { x: -w, y: cy }
+  if (dock === 'right') return { x: vw, y: cy }
+  if (dock === 'top') return { x: cx, y: -h }
+  return { x: cx, y: vh }
+}
+
+/** Peek tab along the free axis at the card center; clamp fully on-screen. */
+function placePeek(tab: HTMLButtonElement, p: Pose) {
+  if (!p.dock) return
+  const pad = 8
+  if (p.dock === 'left' || p.dock === 'right') {
+    const th = tab.offsetHeight || 72
+    tab.style.top = `${clamp(p.y + p.h / 2 - th / 2, pad, window.innerHeight - th - pad)}px`
+    tab.style.left = ''
+  } else {
+    const tw = tab.offsetWidth || 72
+    tab.style.left = `${clamp(p.x + p.w / 2 - tw / 2, pad, window.innerWidth - tw - pad)}px`
+    tab.style.top = ''
+  }
+}
+
+function ensureExit(side: Dock, p: Pose) {
+  const out = 700
+  if (side === 'left') p.vx = Math.min(p.vx, -out)
+  else if (side === 'right') p.vx = Math.max(p.vx, out)
+  else if (side === 'top') p.vy = Math.min(p.vy, -out)
+  else p.vy = Math.max(p.vy, out)
 }
 
 function pickDock(x: number, y: number, w: number, h: number, vx: number, vy: number): Dock | null {
@@ -144,10 +171,13 @@ export function AssistOverlay({ index }: { index: number }) {
     el.style.height = `${p.h}px`
     el.dataset.dock = p.dock ?? ''
     el.classList.toggle('docked', !!p.dock)
-    el.classList.toggle('dragging', !!drag.current)
+    el.classList.toggle('dragging', !!drag.current || !!p.pending)
     setDock((side) => (side === p.dock ? side : p.dock))
     const tab = peek.current
-    if (tab) tab.dataset.dock = p.dock ?? ''
+    if (tab) {
+      tab.dataset.dock = p.dock ?? ''
+      placePeek(tab, p)
+    }
     const image = pic.current
     if (!image) return
     const v = viewOf()
@@ -204,14 +234,31 @@ export function AssistOverlay({ index }: { index: number }) {
       const side = p.pending ?? pickDock(p.x, p.y, p.w, p.h, p.vx, p.vy) ?? pickDock(p.x, p.y, p.w, p.h, 0, 0)
       if (side) {
         p.pending = side
-        const to = park(side, p.w, p.h)
-        p.vx = 0
-        p.vy = 0
-        p.x += (to.x - p.x) * (1 - Math.exp(-10 * dt))
-        p.y += (to.y - p.y) * (1 - Math.exp(-10 * dt))
-        if (Math.hypot(to.x - p.x, to.y - p.y) < 2) {
+        ensureExit(side, p)
+        const to = park(side, p.w, p.h, p)
+        p.x += p.vx * dt
+        p.y += p.vy * dt
+        // Ease free axis to release pose; dock axis coasts with velocity + soft pull
+        const ease = 1 - Math.exp(-10 * dt)
+        if (side === 'left' || side === 'right') {
+          p.y += (to.y - p.y) * ease
+          p.vy *= Math.exp(-8 * dt)
+          p.vx += (to.x - p.x) * 8 * dt
+        } else {
+          p.x += (to.x - p.x) * ease
+          p.vx *= Math.exp(-8 * dt)
+          p.vy += (to.y - p.y) * 8 * dt
+        }
+        const done =
+          (side === 'right' && p.x >= to.x - 2) ||
+          (side === 'left' && p.x <= to.x + 2) ||
+          (side === 'bottom' && p.y >= to.y - 2) ||
+          (side === 'top' && p.y <= to.y + 2)
+        if (done) {
           p.x = to.x
           p.y = to.y
+          p.vx = 0
+          p.vy = 0
           p.dock = side
           p.pending = null
           save(p)
@@ -243,7 +290,7 @@ export function AssistOverlay({ index }: { index: number }) {
       const p = pose.current
       p.w = clamp(p.w, MIN_W, window.innerWidth - 16)
       p.h = clamp(p.h, MIN_H, window.innerHeight - 16)
-      if (p.dock) Object.assign(p, park(p.dock, p.w, p.h))
+      if (p.dock) Object.assign(p, park(p.dock, p.w, p.h, p))
       else {
         p.x = clamp(p.x, 16, window.innerWidth - p.w - 16)
         p.y = clamp(p.y, 16, window.innerHeight - p.h - 16)
@@ -271,25 +318,19 @@ export function AssistOverlay({ index }: { index: number }) {
         p.vx = 0
         p.vy = 0
       } else if (d?.kind === 'move') {
-        p.x += clamp(p.vx, -2400, 2400) * 0.16
-        p.y += clamp(p.vy, -2400, 2400) * 0.16
+        // Keep exact release pose + velocity; RAF coasts into park / settle (no teleport)
         const side = pickDock(p.x, p.y, p.w, p.h, p.vx, p.vy) ?? pickDock(p.x, p.y, p.w, p.h, 0, 0)
         if (side) {
-          Object.assign(p, park(side, p.w, p.h))
-          p.dock = side
-          p.pending = null
+          p.pending = side
+          p.dock = null
+          ensureExit(side, p)
         } else {
           p.pending = null
-          p.x = clamp(p.x, 16, window.innerWidth - p.w - 16)
-          p.y = clamp(p.y, 16, window.innerHeight - p.h - 16)
-          p.home = { x: p.x, y: p.y }
         }
-        p.vx = 0
-        p.vy = 0
       }
       drag.current = null
       const el = root.current
-      if (el) {
+      if (el && !pose.current.pending) {
         el.classList.remove('dragging')
         void el.offsetWidth
       }
@@ -368,7 +409,7 @@ export function AssistOverlay({ index }: { index: number }) {
 
   useEffect(() => {
     paint()
-  }, [index, src])
+  }, [index, src, dock])
 
   useEffect(() => {
     const node = stage.current
