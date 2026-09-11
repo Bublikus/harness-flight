@@ -4,6 +4,8 @@ import * as THREE from 'three'
 import { Plane } from './Plane'
 import { waypointPos } from './Beacons'
 
+export type TurnDirection = -1 | 0 | 1
+
 const tmp = new THREE.Vector3()
 const look = new THREE.Vector3()
 const behind = new THREE.Vector3()
@@ -25,15 +27,18 @@ function wrapPi(a: number) {
 export function Flight({
   index,
   flying,
+  turnDirection,
   onArrived,
 }: {
   index: number
   flying: boolean
+  turnDirection: TurnDirection
   onArrived: () => void
 }) {
   const group = useRef<THREE.Group>(null)
   const arrived = useRef(false)
   const lastIndex = useRef(index)
+  const lastTurnDirection = useRef(turnDirection)
   const yaw = useRef(0)
   const cameraYaw = useRef(0)
   const yawRate = useRef(0)
@@ -45,8 +50,12 @@ export function Flight({
     if (!g) return
     const d = Math.min(dt, 0.05)
 
-    if (lastIndex.current !== index) {
+    if (
+      lastIndex.current !== index ||
+      lastTurnDirection.current !== turnDirection
+    ) {
       lastIndex.current = index
+      lastTurnDirection.current = turnDirection
       arrived.current = false
     }
 
@@ -56,7 +65,9 @@ export function Flight({
     const dist = Math.hypot(dx, dz, dest.y - g.position.y)
     const horiz = Math.hypot(dx, dz)
     const desired = horiz > 0.05 ? Math.atan2(dx, dz) : yaw.current
-    const err = wrapPi(desired - yaw.current)
+    let err = wrapPi(desired - yaw.current)
+    if (turnDirection && Math.abs(err) > Math.PI / 2)
+      err = turnDirection * Math.abs(err)
     const turning = Math.abs(err) > 0.4
 
     if (flying && dist > ARRIVAL_RADIUS) {

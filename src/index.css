@@ -188,23 +188,48 @@ canvas {
   font-size: 14px;
 }
 
-.meter {
-  margin-top: 14px;
-  height: 10px;
-  background: #d9c9a6;
-  border: 2px solid var(--oak-dark);
-}
-
-.meter-fill {
-  height: 100%;
-  background: linear-gradient(#8fd15a, var(--grass));
-  transition: width 1s linear;
-}
-
-.controls {
-  display: flex;
+.flight-pad {
+  display: grid;
+  grid-template-areas:
+    '. up .'
+    'left center right'
+    '. down .';
+  gap: 5px;
   justify-content: center;
-  gap: 10px;
+}
+
+.flight-pad button {
+  width: 44px;
+  height: 36px;
+  padding: 0;
+  font-size: 15px;
+}
+
+.pad-up {
+  grid-area: up;
+}
+
+.pad-left {
+  grid-area: left;
+}
+
+.pad-center {
+  grid-area: center;
+  font-size: 10px !important;
+}
+
+.pad-center:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+.pad-right {
+  grid-area: right;
+}
+
+.pad-down {
+  grid-area: down;
+  visibility: hidden;
 }
 
 button {

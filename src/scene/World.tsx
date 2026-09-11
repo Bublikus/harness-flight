@@ -2,15 +2,17 @@ import { Canvas } from '@react-three/fiber'
 import { Sky } from '@react-three/drei'
 import { Terrain } from './Terrain'
 import { Beacons } from './Beacons'
-import { Flight } from './Flight'
+import { Flight, type TurnDirection } from './Flight'
 
 export function World({
   index,
   flying,
+  turnDirection,
   onArrived,
 }: {
   index: number
   flying: boolean
+  turnDirection: TurnDirection
   onArrived: () => void
 }) {
   return (
@@ -32,7 +34,12 @@ export function World({
       />
       <Terrain />
       <Beacons current={index} flying={flying} />
-      <Flight index={index} flying={flying} onArrived={onArrived} />
+      <Flight
+        index={index}
+        flying={flying}
+        turnDirection={turnDirection}
+        onArrived={onArrived}
+      />
     </Canvas>
   )
 }

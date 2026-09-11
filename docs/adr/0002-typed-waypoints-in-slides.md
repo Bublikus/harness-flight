@@ -1,6 +1,6 @@
 # ADR-0002: Talk content as typed waypoints in slides.ts
 
-- Status: Accepted
+- Status: Superseded by ADR-0009
 - Date: 2026-09-11
 - Deciders: this session
 

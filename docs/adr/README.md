@@ -5,12 +5,14 @@ Index of lasting presentation choices. Procedure: `adr` skill.
 | # | Title | Status |
 |---|---|---|
 | [0001](0001-r3f-minecraft-flight-talk.md) | Vite + R3F Minecraft flight as the talk surface | Accepted |
-| [0002](0002-typed-waypoints-in-slides.md) | Talk content as typed waypoints in `slides.ts` | Accepted |
+| [0002](0002-typed-waypoints-in-slides.md) | Talk content as typed waypoints in `slides.ts` | Superseded by ADR-0009 |
 | [0003](0003-github-pages-from-main.md) | Deploy the live talk from `main` to GitHub Pages | Accepted |
 | [0004](0004-overlay-hud-dim-in-flight.md) | Overlay HUD; dim the sign while flying | Superseded by ADR-0005 |
 | [0005](0005-in-world-signs-on-posts.md) | In-world signs that dock on waypoint posts | Superseded by ADR-0006 |
 | [0006](0006-chase-cam-hops-overlay-when-parked.md) | Chase-cam hops; talk copy only when parked | Accepted |
 | [0007](0007-interruptible-uturn-hops.md) | Interruptible hops with a banked U-turn | Accepted |
+| [0008](0008-directional-flight-pad.md) | Directional flight pad | Accepted |
+| [0009](0009-user-paced-presentation.md) | User-paced presentation | Accepted |
 
 Restore a talk version with `git log --oneline` then `git checkout <commit>`:
 
@@ -19,3 +21,4 @@ Restore a talk version with `git log --oneline` then `git checkout <commit>`:
 - `Put talk copy on in-world signs that dock on posts` — in-world signs; HUD chrome hides in flight (ADR-0005).
 - `Keep the chase cam on the plane during hops` — overlay card only when parked (ADR-0006).
 - `Make waypoint hops interruptible and smooth` — banked U-turns, approach braking, seamless docking (ADR-0007).
+- `Make presentation fully user-controlled` — directional D-pad with no timing constraints (ADR-0008/0009).

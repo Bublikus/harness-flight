@@ -1,13 +1,7 @@
-import { SLIDES, TOTAL_SEC, type Slide } from './slides'
+import { SLIDES, type Slide } from './slides'
 import { SlideArt } from './SlideArt'
 
-export function SignCard({
-  slide: s,
-  remaining,
-}: {
-  slide: Slide
-  remaining: number
-}) {
+export function SignCard({ slide: s }: { slide: Slide }) {
   return (
     <div className="sign">
       <SlideArt key={s.id} id={s.id} />
@@ -20,12 +14,6 @@ export function SignCard({
             <li key={p}>{p}</li>
           ))}
         </ul>
-        <div className="meter">
-          <div
-            className="meter-fill"
-            style={{ width: `${(remaining / s.durationSec) * 100}%` }}
-          />
-        </div>
       </div>
     </div>
   )
@@ -34,25 +22,17 @@ export function SignCard({
 export function Hud({
   index,
   flying,
-  paused,
-  remaining,
-  onNext,
-  onPrev,
-  onTogglePause,
+  onForward,
+  onTurnLeft,
+  onTurnRight,
 }: {
   index: number
   flying: boolean
-  paused: boolean
-  remaining: number
-  onNext: () => void
-  onPrev: () => void
-  onTogglePause: () => void
+  onForward: () => void
+  onTurnLeft: () => void
+  onTurnRight: () => void
 }) {
   const s = SLIDES[index]
-  const done = SLIDES.slice(0, index).reduce((a, x) => a + x.durationSec, 0)
-  const talkLeft = TOTAL_SEC - done - (s.durationSec - remaining)
-  const mins = Math.max(0, Math.floor(talkLeft / 60))
-  const secs = Math.max(0, Math.floor(talkLeft % 60))
 
   return (
     <div className="hud">
@@ -62,31 +42,61 @@ export function Hud({
           HARNESS FLIGHT
         </div>
         <div className="clock">
-          T−{mins}:{String(secs).padStart(2, '0')} · {index + 1}/{SLIDES.length}
+          WAYPOINT {index + 1}/{SLIDES.length}
         </div>
       </header>
 
       {!flying && (
         <div className="hud-card">
-          <SignCard slide={s} remaining={remaining} />
+          <SignCard slide={s} />
         </div>
       )}
 
       <div className="hud-bottom chrome">
-        <nav className="controls">
-          <button type="button" onClick={onPrev} disabled={index === 0}>
-            ◀ Prev
-          </button>
-          <button type="button" onClick={onTogglePause} disabled={flying}>
-            {paused ? '▶ Autopilot' : '❚❚ Hold'}
+        <nav className="flight-pad" aria-label="Flight controls">
+          <button
+            type="button"
+            className="pad-up primary"
+            onClick={onForward}
+            disabled={index === SLIDES.length - 1}
+            aria-label="Fly to next slide"
+          >
+            ↑
           </button>
           <button
             type="button"
-            className="primary"
-            onClick={onNext}
-            disabled={index === SLIDES.length - 1}
+            className="pad-left"
+            onClick={onTurnLeft}
+            disabled={index === 0}
+            aria-label="Turn left and return to previous slide"
           >
-            Next waypoint ▶
+            ←
+          </button>
+          <button
+            type="button"
+            className="pad-center"
+            disabled
+            aria-label="Flight control center"
+          >
+            ◆
+          </button>
+          <button
+            type="button"
+            className="pad-right"
+            onClick={onTurnRight}
+            disabled={index === 0}
+            aria-label="Turn right and return to previous slide"
+          >
+            →
+          </button>
+          <button
+            type="button"
+            className="pad-down"
+            disabled
+            aria-label="Reserved flight control"
+            title="Reserved"
+          >
+            ↓
           </button>
         </nav>
         <div className="dots">
@@ -105,7 +115,7 @@ export function Hud({
 export function TitleScreen({ onStart }: { onStart: () => void }) {
   return (
     <div className="title-screen">
-      <p className="kicker">A 20-minute campaign</p>
+      <p className="kicker">A self-paced campaign</p>
       <h1>
         FLY THE
         <br />
@@ -117,7 +127,7 @@ export function TitleScreen({ onStart }: { onStart: () => void }) {
       <button type="button" className="primary big" onClick={onStart}>
         Take off
       </button>
-      <p className="hint">Space = next waypoint · ← = turn back · P = pause</p>
+      <p className="hint">↑ forward · ←/→ choose U-turn · ↓ reserved</p>
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Hud, TitleScreen } from './Hud'
 import { World } from './scene/World'
+import type { TurnDirection } from './scene/Flight'
 import { SLIDES } from './slides'
 import './index.css'
 
@@ -8,61 +9,44 @@ export default function App() {
   const [started, setStarted] = useState(false)
   const [index, setIndex] = useState(0)
   const [flying, setFlying] = useState(false)
-  const [paused, setPaused] = useState(false)
-  const [remaining, setRemaining] = useState(SLIDES[0].durationSec)
+  const [turnDirection, setTurnDirection] = useState<TurnDirection>(0)
 
-  const go = useCallback((next: number) => {
+  const go = useCallback((next: number, turn: TurnDirection = 0) => {
     if (next < 0 || next >= SLIDES.length) return
     setFlying(true)
+    setTurnDirection(turn)
     setIndex(next)
-    setRemaining(SLIDES[next].durationSec)
   }, [])
 
   useEffect(() => {
-    if (!started || flying || paused) return
-    const id = window.setInterval(() => {
-      setRemaining((r) => {
-        if (r <= 1) {
-          if (index < SLIDES.length - 1) window.setTimeout(() => go(index + 1), 0)
-          return 0
-        }
-        return r - 1
-      })
-    }, 1000)
-    return () => window.clearInterval(id)
-  }, [started, flying, paused, index, go])
-
-  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
+      if (e.code === 'Space' || e.code === 'ArrowUp') {
         e.preventDefault()
         if (!started) setStarted(true)
         else go(index + 1)
       }
-      if (e.code === 'KeyP' && !flying) setPaused((p) => !p)
-      if (e.code === 'ArrowRight') go(index + 1)
-      if (e.code === 'ArrowLeft') go(index - 1)
+      if (e.code === 'ArrowLeft') go(index - 1, 1)
+      if (e.code === 'ArrowRight') go(index - 1, -1)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [started, flying, index, go])
+  }, [started, index, go])
 
   return (
     <div className="app">
       <World
         index={index}
         flying={flying}
+        turnDirection={turnDirection}
         onArrived={() => setFlying(false)}
       />
       {started ? (
         <Hud
           index={index}
           flying={flying}
-          paused={paused}
-          remaining={remaining}
-          onNext={() => go(index + 1)}
-          onPrev={() => go(index - 1)}
-          onTogglePause={() => setPaused((p) => !p)}
+          onForward={() => go(index + 1)}
+          onTurnLeft={() => go(index - 1, 1)}
+          onTurnRight={() => go(index - 1, -1)}
         />
       ) : (
         <TitleScreen onStart={() => setStarted(true)} />
