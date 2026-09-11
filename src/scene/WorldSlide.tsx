@@ -11,18 +11,24 @@ const WIDTH = 16
 const HEIGHT = 7.5
 /** rise=0 center: frame top (half of HEIGHT+0.5) sits below grass at y≈0. */
 const SUNK_Y = -(HEIGHT + 0.5) / 2 - 1
+/** Sunk start size vs parked (1). Large enough to read mid-flight; small enough to read as depth. */
+const ZOOM_SUNK = 0.48
 /** Board-local swoop (side / behind / toward camera). Spring overshoot past rise=1 is the settle. */
 function flight(rise: number, parkedY: number, yaw: number, side: 1 | -1) {
+  // Drive rise straight from the spring — no piecewise remaps (those kink velocity at rise=1).
   const u = 1 - rise
   const swell = Math.sin(Math.PI * rise)
   const lx = 3.2 * side * u
-  const lz = -1.8 * u + 2.4 * swell
+  const lz = -2.4 * u + 1.6 * swell
   const c = Math.cos(yaw)
   const s = Math.sin(yaw)
+  // Appear: grow from ZOOM_SUNK → 1; disappear: shrink. Clamp so spring >1 stays parked size.
+  const zoom = THREE.MathUtils.lerp(ZOOM_SUNK, 1, THREE.MathUtils.clamp(rise, 0, 1))
   return {
     x: lx * c + lz * s,
     y: THREE.MathUtils.lerp(SUNK_Y, parkedY, rise) + 0.5 * swell,
     z: -lx * s + lz * c,
+    zoom,
   }
 }
 const TEXTURE_WIDTH = 1536
@@ -209,18 +215,22 @@ function WorldSlideCard({
 
     const d = Math.min(dt, 0.05)
     card.visible = true
+    // Target-based params: soft appear (incl. settle), snappy sink. Do NOT flip on
+    // overshoot (target > rise) — that snaps k/d exactly when the first bounce starts.
+    const appear = target === 1
     velocity.current =
-      (velocity.current + (target - rise.current) * 68 * d) *
-      Math.exp(-9 * d)
+      (velocity.current + (target - rise.current) * (appear ? 40 : 68) * d) *
+      Math.exp(-(appear ? 8.5 : 9) * d)
     rise.current += velocity.current * d
     const f = flight(rise.current, pose.y, pose.rotation, side.current)
     card.position.set(pose.x + f.x, f.y, pose.z + f.z)
     card.rotation.set(0, pose.rotation, 0)
 
     const worldWidth = viewport.getCurrentViewport(state.camera, card.position).width
-    const targetScale = THREE.MathUtils.clamp(worldWidth * 0.86 / WIDTH, 0.46, 1)
-    scale.current = THREE.MathUtils.damp(scale.current, targetScale, 8, d)
-    card.scale.setScalar(scale.current)
+    const parked = THREE.MathUtils.clamp(worldWidth * 0.86 / WIDTH, 0.46, 1)
+    scale.current = THREE.MathUtils.damp(scale.current, parked, 8, d)
+    const s = scale.current * f.zoom
+    card.scale.setScalar(s)
 
     if (active) {
       card.updateWorldMatrix(true, false)
@@ -229,7 +239,6 @@ function WorldSlideCard({
       slidePose.right.set(1, 0, 0).transformDirection(card.matrixWorld)
       slidePose.up.set(0, 1, 0).transformDirection(card.matrixWorld)
       slidePose.normal.set(0, 0, 1).transformDirection(card.matrixWorld)
-      const s = scale.current
       slidePose.half.set(
         ((WIDTH + 0.5) * 0.5) * s,
         ((HEIGHT + 0.5) * 0.5) * s,
