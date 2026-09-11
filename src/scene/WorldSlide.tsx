@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { getSlideArt } from '../SlideArt'
 import { SLIDES, type Slide } from '../slides'
 import { waypointPos } from './Beacons'
+import { blockMaterials } from './blockTextures'
 
 const WIDTH = 16
 const HEIGHT = 7.5
@@ -115,18 +116,22 @@ function routePose(index: number, facing: 1 | -1) {
   }
 }
 
-export function WorldSlide({
+function WorldSlideCard({
   index,
   started,
   flying,
   approaching,
   facing,
+  active,
+  onExited,
 }: {
   index: number
   started: boolean
   flying: boolean
   approaching: boolean
   facing: 1 | -1
+  active: boolean
+  onExited: () => void
 }) {
   const group = useRef<THREE.Group>(null)
   const rise = useRef(0)
@@ -135,7 +140,8 @@ export function WorldSlide({
   const { gl, viewport } = useThree()
   const slide = SLIDES[index]
   const pose = useMemo(() => routePose(index, facing), [index, facing])
-  const visible = started && (!flying || approaching)
+  const raised = active && started && (!flying || approaching)
+  const frame = useMemo(() => blockMaterials('plank', [WIDTH + 0.5, HEIGHT + 0.5, 0.34]), [])
   const { canvas, texture } = useMemo(() => {
     const canvas = document.createElement('canvas')
     canvas.width = TEXTURE_WIDTH
@@ -163,16 +169,24 @@ export function WorldSlide({
   useFrame((state, dt) => {
     const card = group.current
     if (!card) return
-    if (!visible) {
+    const target = raised ? 1 : 0
+    if (
+      !target &&
+      Math.abs(rise.current) < 0.002 &&
+      Math.abs(velocity.current) < 0.002
+    ) {
       card.visible = false
       rise.current = 0
       velocity.current = 0
+      if (!active) onExited()
       return
     }
 
     const d = Math.min(dt, 0.05)
     card.visible = true
-    velocity.current = (velocity.current + (1 - rise.current) * 68 * d) * Math.exp(-9 * d)
+    velocity.current =
+      (velocity.current + (target - rise.current) * 68 * d) *
+      Math.exp(-9 * d)
     rise.current += velocity.current * d
     card.position.y = THREE.MathUtils.lerp(3.9, pose.y, rise.current)
 
@@ -189,9 +203,8 @@ export function WorldSlide({
       rotation={[0, pose.rotation, 0]}
       visible={false}
     >
-      <mesh>
+      <mesh material={frame}>
         <boxGeometry args={[WIDTH + 0.5, HEIGHT + 0.5, 0.34]} />
-        <meshLambertMaterial color="#3a2414" />
       </mesh>
       <mesh position={[0, 0, 0.18]}>
         <planeGeometry args={[WIDTH, HEIGHT]} />
@@ -199,4 +212,53 @@ export function WorldSlide({
       </mesh>
     </group>
   )
+}
+
+export function WorldSlide({
+  index,
+  started,
+  flying,
+  approaching,
+  facing,
+}: {
+  index: number
+  started: boolean
+  flying: boolean
+  approaching: boolean
+  facing: 1 | -1
+}) {
+  const [state, setState] = useState(() => ({
+    current: index,
+    cards: [{ index, facing }],
+  }))
+  if (state.current !== index)
+    setState({
+      current: index,
+      cards: state.cards.some((card) => card.index === index)
+        ? state.cards
+        : [...state.cards, { index, facing }],
+    })
+
+  const remove = useCallback((exited: number) => {
+    setState((state) =>
+      exited === state.current
+        ? state
+        : {
+            ...state,
+            cards: state.cards.filter((card) => card.index !== exited),
+          },
+    )
+  }, [])
+
+  return state.cards.map((card) => (
+    <WorldSlideCard
+      key={SLIDES[card.index].id}
+      {...card}
+      started={started}
+      flying={flying}
+      approaching={approaching}
+      active={card.index === index}
+      onExited={() => remove(card.index)}
+    />
+  ))
 }

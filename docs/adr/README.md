@@ -17,7 +17,8 @@ Index of lasting presentation choices. Procedure: `adr` skill.
 | [0011](0011-slide-rises-on-final-approach.md) | Slide rises on final approach | Superseded by ADR-0014 |
 | [0012](0012-bidirectional-pagination.md) | Bidirectional pagination | Accepted |
 | [0013](0013-synchronized-speaker-notes.md) | Synchronized speaker notes | Accepted |
-| [0014](0014-world-space-slide-surface.md) | World-space slide surface | Proposed |
+| [0014](0014-world-space-slide-surface.md) | World-space slide surface | Accepted |
+| [0015](0015-departing-slides-spring-down.md) | Departing world slides spring down | Accepted |
 
 Restore a talk version with `git log --oneline` then `git checkout <commit>`:
 
@@ -28,3 +29,5 @@ Restore a talk version with `git log --oneline` then `git checkout <commit>`:
 - `Make waypoint hops interruptible and smooth` — banked U-turns, approach braking, seamless docking (ADR-0007).
 - `Make presentation fully user-controlled` — directional D-pad with no timing constraints (ADR-0008/0009).
 - `Keep every flight reversible` — side controls swap active hop endpoints at any time (ADR-0010).
+- `Render slides in the flight world` — world-space CanvasTexture board (ADR-0014).
+- `Sink departing world slides before unmounting` — outgoing boards stay until the spring settles (ADR-0015).
