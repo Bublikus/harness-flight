@@ -1,12 +1,4 @@
 import { SLIDES } from './slides'
-import './speaker-notes.css'
-
-function openSpeakerNotes() {
-  const url = new URL(window.location.href)
-  url.searchParams.set('view', 'notes')
-  url.hash = ''
-  window.open(url, 'harness-flight-notes', 'noopener,noreferrer')
-}
 
 export function Hud({
   index,
@@ -34,63 +26,21 @@ export function Hud({
           <span className="diamond" />
           HARNESS FLIGHT
         </div>
-        <div className="presenter-tools">
-          <button type="button" className="notes-opener" onClick={openSpeakerNotes}>
-            Speaker notes
-          </button>
-          <div className="clock">
-            WAYPOINT {index + 1}/{SLIDES.length}
-          </div>
+        <div className="clock">
+          WAYPOINT {index + 1}/{SLIDES.length}
         </div>
       </header>
 
       <div className="hud-bottom chrome">
-        <nav className="flight-pad" aria-label="Flight controls">
-          <button
-            type="button"
-            className="pad-up primary"
-            onClick={onUp}
-            disabled={upTarget < 0 || upTarget >= SLIDES.length}
-            aria-label={`Fly to ${upTarget > index ? 'next' : 'previous'} slide`}
-          >
-            ↑
-          </button>
-          <button
-            type="button"
-            className="pad-left"
-            onClick={onTurnLeft}
-            disabled={!canTurnBack}
-            aria-label="Turn left and return to previous slide"
-          >
-            ←
-          </button>
-          <button
-            type="button"
-            className="pad-center"
-            disabled
-            aria-label="Flight control center"
-          >
-            ◆
-          </button>
-          <button
-            type="button"
-            className="pad-right"
-            onClick={onTurnRight}
-            disabled={!canTurnBack}
-            aria-label="Turn right and return to previous slide"
-          >
-            →
-          </button>
-          <button
-            type="button"
-            className="pad-down"
-            onClick={onDown}
-            disabled={downTarget < 0 || downTarget >= SLIDES.length}
-            aria-label={`Fly to ${downTarget > index ? 'next' : 'previous'} slide`}
-          >
-            ↓
-          </button>
-        </nav>
+        <FlightPad
+          upDisabled={upTarget < 0 || upTarget >= SLIDES.length}
+          downDisabled={downTarget < 0 || downTarget >= SLIDES.length}
+          turnDisabled={!canTurnBack}
+          onUp={onUp}
+          onDown={onDown}
+          onTurnLeft={onTurnLeft}
+          onTurnRight={onTurnRight}
+        />
         <div className="dots">
           {SLIDES.map((sl, i) => (
             <span
@@ -104,9 +54,71 @@ export function Hud({
   )
 }
 
+function FlightPad({
+  upDisabled,
+  downDisabled,
+  turnDisabled,
+  onUp,
+  onDown,
+  onTurnLeft,
+  onTurnRight,
+}: {
+  upDisabled?: boolean
+  downDisabled?: boolean
+  turnDisabled?: boolean
+  onUp?: () => void
+  onDown?: () => void
+  onTurnLeft?: () => void
+  onTurnRight?: () => void
+}) {
+  return (
+    <nav className="flight-pad" aria-label="Flight controls">
+      <button
+        type="button"
+        className="pad-up primary"
+        disabled={upDisabled}
+        onClick={onUp}
+        aria-label="Fly forward"
+      >
+        ↑
+      </button>
+      <button
+        type="button"
+        className="pad-left"
+        disabled={turnDisabled}
+        onClick={onTurnLeft}
+        aria-label="Turn left"
+      >
+        ←
+      </button>
+      <button type="button" className="pad-center" disabled aria-label="Flight control center">
+        ◆
+      </button>
+      <button
+        type="button"
+        className="pad-right"
+        disabled={turnDisabled}
+        onClick={onTurnRight}
+        aria-label="Turn right"
+      >
+        →
+      </button>
+      <button
+        type="button"
+        className="pad-down"
+        disabled={downDisabled}
+        onClick={onDown}
+        aria-label="Fly back"
+      >
+        ↓
+      </button>
+    </nav>
+  )
+}
+
 export function TitleScreen({ onStart }: { onStart: () => void }) {
   return (
-    <div className="title-screen">
+    <div className="title-screen" onPointerUp={(e) => e.button === 0 && onStart()}>
       <p className="kicker">A self-paced campaign</p>
       <h1>
         FLY THE
@@ -116,10 +128,8 @@ export function TitleScreen({ onStart }: { onStart: () => void }) {
       <p className="sub">
         Minecraft skies. Twelve waypoints. One operating system for the agent.
       </p>
-      <button type="button" className="primary big" onClick={onStart}>
-        Take off
-      </button>
-      <p className="hint">↑/↓ paginate · ←/→ U-turn and reverse</p>
+      <FlightPad upDisabled downDisabled turnDisabled />
+      <p className="hint">Tap / Space / ↑ start · ↑/↓ paginate · ←/→ U-turn and reverse</p>
     </div>
   )
 }

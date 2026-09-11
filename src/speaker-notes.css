@@ -4,22 +4,6 @@ body {
   margin: 0;
 }
 
-.presenter-tools {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.notes-opener {
-  padding: 8px 10px;
-  border-width: 2px;
-  box-shadow: 0 3px 0 var(--oak-dark);
-  font-size: 7px;
-  text-shadow: none;
-  white-space: nowrap;
-}
-
-.notes-opener:focus-visible,
 .notes-view button:focus-visible {
   outline: 4px solid #fff;
   outline-offset: 4px;
@@ -309,15 +293,6 @@ kbd {
 }
 
 @media (max-width: 560px) {
-  .presenter-tools {
-    gap: 8px;
-  }
-
-  .notes-opener {
-    padding: 7px;
-    font-size: 6px;
-  }
-
   .notes-topbar {
     align-items: flex-start;
     flex-direction: column;

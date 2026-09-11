@@ -8,7 +8,7 @@
 Presenters need private, readable guidance that follows the audience-facing waypoint without adding timers or burdening the Three.js flight view. The notes may be opened or reloaded after the presentation has already advanced, and either window may temporarily be unavailable.
 
 ## Decision
-Serve a lightweight notes view from the existing Vite entry point under `?view=notes`, loaded through a separate dynamic import so it does not render or load the Three.js world. An explicit presentation button opens that view without retaining `window.opener`.
+Serve a lightweight notes view from the existing Vite entry point under `?view=notes`, loaded through a separate dynamic import so it does not render or load the Three.js world. Pressing N on the talk view opens that window without retaining `window.opener`.
 
 Synchronize slide indices and navigation commands over a same-origin `BroadcastChannel`. Mirror the current slide as a small timestamped `localStorage` snapshot, and use storage events as the transport fallback. The presentation publishes a heartbeat so the notes view can distinguish live synchronization from a saved or stale snapshot. Notes navigation remains entirely user-paced.
 

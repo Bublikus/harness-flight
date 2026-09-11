@@ -1,0 +1,160 @@
+.assist {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 280px;
+  min-height: 200px;
+  background: var(--paper);
+  border: 3px solid var(--oak-dark);
+  box-shadow: 6px 6px 0 var(--oak-dark);
+  color: var(--ink);
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  will-change: transform;
+  transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.assist.dragging {
+  transition: none;
+}
+
+.assist.docked {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  pointer-events: none;
+}
+
+.assist.docked .assist-bar,
+.assist.docked .assist-view,
+.assist.docked .assist-resize {
+  visibility: hidden;
+}
+
+.assist-tab {
+  position: fixed;
+  z-index: 21;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  font-size: 10px;
+  line-height: 1;
+  background: var(--gold);
+  box-shadow: 3px 3px 0 var(--oak-dark);
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+}
+
+.assist-tab[data-dock='left'],
+.assist-tab[data-dock='right'] {
+  display: grid;
+  top: 50%;
+  width: 36px;
+  height: 72px;
+  transform: translateY(-50%);
+}
+
+.assist-tab[data-dock='left'] {
+  left: 0;
+}
+
+.assist-tab[data-dock='right'] {
+  right: 0;
+}
+
+.assist-tab[data-dock='top'],
+.assist-tab[data-dock='bottom'] {
+  display: grid;
+  left: 50%;
+  width: 72px;
+  height: 36px;
+  transform: translateX(-50%);
+}
+
+.assist-tab[data-dock='top'] {
+  top: 0;
+}
+
+.assist-tab[data-dock='bottom'] {
+  bottom: 0;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .assist-tab[data-dock='left'],
+  .assist-tab[data-dock='right'] {
+    width: 44px;
+    height: 80px;
+  }
+
+  .assist-tab[data-dock='top'],
+  .assist-tab[data-dock='bottom'] {
+    width: 80px;
+    height: 44px;
+  }
+}
+
+.assist-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 34px;
+  padding: 0 10px;
+  cursor: grab;
+  background: #efe0b8;
+  border-bottom: 3px solid var(--oak-dark);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+}
+
+.assist-bar:active {
+  cursor: grabbing;
+}
+
+.assist-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.7;
+}
+
+.assist-view {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  cursor: grab;
+  background: #ddd3b8;
+  touch-action: none;
+}
+
+.assist-view:active {
+  cursor: grabbing;
+}
+
+.assist-view img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+
+.assist-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  background:
+    linear-gradient(135deg, transparent 50%, var(--oak-dark) 50%) no-repeat bottom right / 12px 12px;
+}

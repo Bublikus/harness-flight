@@ -19,6 +19,7 @@ Index of lasting presentation choices. Procedure: `adr` skill.
 | [0013](0013-synchronized-speaker-notes.md) | Synchronized speaker notes | Accepted |
 | [0014](0014-world-space-slide-surface.md) | World-space slide surface | Accepted |
 | [0015](0015-departing-slides-spring-down.md) | Departing world slides spring down | Accepted |
+| [0016](0016-slide-assist-overlay.md) | Draggable slide-assist overlay | Accepted |
 
 Restore a talk version with `git log --oneline` then `git checkout <commit>`:
 

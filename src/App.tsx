@@ -1,10 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
+import { AssistOverlay } from './AssistOverlay'
 import { Hud, TitleScreen } from './Hud'
 import { World } from './scene/World'
 import type { TurnDirection } from './scene/Flight'
 import { SLIDES } from './slides'
 import { usePresentationSync } from './presentationSync'
 import './index.css'
+
+function openSpeakerNotes() {
+  const url = new URL(window.location.href)
+  url.searchParams.set('view', 'notes')
+  url.hash = ''
+  window.open(url, 'harness-flight-notes', 'noopener,noreferrer')
+}
 
 export default function App() {
   const [started, setStarted] = useState(false)
@@ -51,6 +59,10 @@ export default function App() {
       }
       if (e.code === 'ArrowLeft') turnBack(1)
       if (e.code === 'ArrowRight') turnBack(-1)
+      if (e.code === 'KeyN') {
+        e.preventDefault()
+        openSpeakerNotes()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -72,16 +84,19 @@ export default function App() {
         }}
       />
       {started ? (
-        <Hud
-          index={index}
-          canTurnBack={backIndex !== null}
-          upTarget={upTarget}
-          downTarget={downTarget}
-          onUp={() => go(upTarget)}
-          onDown={() => go(downTarget)}
-          onTurnLeft={() => turnBack(1)}
-          onTurnRight={() => turnBack(-1)}
-        />
+        <>
+          <Hud
+            index={index}
+            canTurnBack={backIndex !== null}
+            upTarget={upTarget}
+            downTarget={downTarget}
+            onUp={() => go(upTarget)}
+            onDown={() => go(downTarget)}
+            onTurnLeft={() => turnBack(1)}
+            onTurnRight={() => turnBack(-1)}
+          />
+          <AssistOverlay index={index} />
+        </>
       ) : (
         <TitleScreen onStart={() => setStarted(true)} />
       )}

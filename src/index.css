@@ -23,6 +23,7 @@ body,
   margin: 0;
   background: #7ec4ee;
   overflow: hidden;
+  touch-action: none;
   font-family: Outfit, system-ui, sans-serif;
 }
 
@@ -47,7 +48,8 @@ canvas {
 .topbar,
 .hud-bottom,
 .controls,
-.dots {
+.dots,
+.flight-pad {
   pointer-events: auto;
 }
 
@@ -122,7 +124,19 @@ canvas {
 
 .pad-down {
   grid-area: down;
-  visibility: hidden;
+}
+
+@media (hover: hover) and (pointer: fine) and (min-width: 721px) {
+  .hud .flight-pad {
+    display: none;
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .flight-pad button {
+    width: 52px;
+    height: 44px;
+  }
 }
 
 button {
@@ -143,11 +157,6 @@ button:disabled {
 
 button.primary {
   background: var(--gold);
-}
-
-button.big {
-  font-size: 12px;
-  padding: 16px 22px;
 }
 
 button:active:not(:disabled) {
@@ -196,6 +205,9 @@ button:active:not(:disabled) {
   background: linear-gradient(transparent 20%, rgba(20, 40, 10, 0.55) 100%);
   color: #fff;
   text-align: center;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
 }
 
 .kicker {
@@ -219,6 +231,16 @@ button:active:not(:disabled) {
   line-height: 1.45;
   margin: 0 0 22px;
   text-shadow: 0 2px 8px #000;
+}
+
+.title-screen .flight-pad {
+  margin-top: 18px;
+}
+
+.title-screen .flight-pad button:disabled {
+  opacity: 1;
+  cursor: default;
+  pointer-events: none;
 }
 
 .hint {
