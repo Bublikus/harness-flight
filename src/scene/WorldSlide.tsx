@@ -22,8 +22,9 @@ function flight(rise: number, parkedY: number, yaw: number, side: 1 | -1) {
   const lz = -2.4 * u + 1.6 * swell
   const c = Math.cos(yaw)
   const s = Math.sin(yaw)
-  // Appear: grow from ZOOM_SUNK → 1; disappear: shrink. Clamp so spring >1 stays parked size.
-  const zoom = THREE.MathUtils.lerp(ZOOM_SUNK, 1, THREE.MathUtils.clamp(rise, 0, 1))
+  // Appear/disappear zoom tracks rise with the spring (incl. overshoot) so scale doesn't
+  // flatline at rise=1 while position still settles — that C1 kink reads as a hitch.
+  const zoom = THREE.MathUtils.lerp(ZOOM_SUNK, 1, rise)
   return {
     x: lx * c + lz * s,
     y: THREE.MathUtils.lerp(SUNK_Y, parkedY, rise) + 0.5 * swell,
@@ -162,6 +163,7 @@ function WorldSlideCard({
   const rise = useRef(0)
   const velocity = useRef(0)
   const scale = useRef(1)
+  const fitAt = useRef(new THREE.Vector3())
   const side = useRef<1 | -1>(Math.random() < 0.5 ? 1 : -1)
   const { gl, viewport } = useThree()
   const slide = SLIDES[index]
@@ -226,7 +228,10 @@ function WorldSlideCard({
     card.position.set(pose.x + f.x, f.y, pose.z + f.z)
     card.rotation.set(0, pose.rotation, 0)
 
-    const worldWidth = viewport.getCurrentViewport(state.camera, card.position).width
+    // Fit against the parked pose, not the in-flight center — live position made
+    // perspective width (and thus scale) wobble during spring overshoot.
+    fitAt.current.set(pose.x, pose.y, pose.z)
+    const worldWidth = viewport.getCurrentViewport(state.camera, fitAt.current).width
     const parked = THREE.MathUtils.clamp(worldWidth * 0.86 / WIDTH, 0.46, 1)
     scale.current = THREE.MathUtils.damp(scale.current, parked, 8, d)
     const s = scale.current * f.zoom
