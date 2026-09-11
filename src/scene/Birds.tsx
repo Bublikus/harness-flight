@@ -23,7 +23,10 @@ const MAX_SPEED = 7.6
 const CLEARANCE = 3.4
 const ALT_PAD = 12
 const PERCH_CHANCE = 0.018
-const APPROACH_R = 1.15
+/** Settle onto perch by distance — never teleport from farther than this. */
+const LAND_R = 0.12
+const ALT_LIFT = 7
+const SEP_MIN_D = 0.4
 
 type Purpose = 'wander' | 'forage' | 'commute' | 'solo'
 type Phase = 'fly' | 'approach' | 'perch'
@@ -189,28 +192,31 @@ export function Birds() {
       const b = birds[i]
 
       if (b.mode === 'perch' && b.perch) {
-        b.p.copy(b.perch)
+        // Soft settle — remaining gap is at most LAND_R after approach.
+        b.p.lerp(b.perch, Math.min(1, t * 10))
         b.v.set(0.02, 0, 0.01)
         b.perchUntil -= t
         if (b.perchUntil <= 0) {
           b.mode = 'fly'
           b.perch = null
           skyPoint(b.purpose, b.goal)
-          const heading = rnd(0, Math.PI * 2)
-          b.v.set(Math.cos(heading), 0.35, Math.sin(heading)).multiplyScalar(b.minSp + 0.8)
+          // Lift along prior perch facing + up (no heading teleport).
+          tmp.set(1, 0.55, 0.15).normalize()
+          b.v.copy(tmp).multiplyScalar(b.minSp + 0.5)
           b.retargetAt = time + rnd(3, 10)
         }
       } else if (b.mode === 'approach' && b.perch) {
         tmp.copy(b.perch).sub(b.p)
         const d = tmp.length()
-        if (d < APPROACH_R) {
+        if (d < LAND_R) {
           b.mode = 'perch'
-          b.p.copy(b.perch)
           b.v.set(0, 0, 0)
           b.perchUntil = rnd(2.2, 7.5)
         } else {
-          steer.copy(tmp).normalize()
-          b.v.lerp(steer.multiplyScalar(b.minSp * 0.85), Math.min(1, t * 2.2))
+          // Arrive: slow as distance shrinks — continuous integrate, no snap.
+          const desired = Math.min(b.minSp * 0.9, Math.max(0.35, d * 1.6))
+          steer.copy(tmp).multiplyScalar(desired / d)
+          b.v.lerp(steer, Math.min(1, t * 3.2))
           b.p.addScaledVector(b.v, t)
         }
       } else {
@@ -245,7 +251,7 @@ export function Birds() {
           tmp.copy(b.p).sub(o.p)
           const d = tmp.length()
           if (d < SEP_R && d > 1e-4) {
-            sep.addScaledVector(tmp, 1 / (d * d))
+            sep.addScaledVector(tmp, 1 / (Math.max(d, SEP_MIN_D) * Math.max(d, SEP_MIN_D)))
             nSep++
           }
           if (b.group >= 0 && o.group === b.group && d < VIS_R) {
@@ -287,7 +293,11 @@ export function Birds() {
         b.v.addScaledVector(steer, t)
         limit(b.v, b.minSp, b.maxSp)
         b.p.addScaledVector(b.v, t)
-        if (b.p.y < floor) b.p.y = floor
+        // Soft altitude — terrainHeight is stepped (Math.round); never snap Y.
+        if (b.p.y < floor) {
+          b.p.y += Math.min(floor - b.p.y, ALT_LIFT * t)
+          if (b.v.y < 0) b.v.y *= 0.25
+        }
       }
 
       const speed = Math.max(b.v.length(), 0.05)
