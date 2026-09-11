@@ -28,33 +28,30 @@ function clamp(n: number, a: number, b: number) {
 function load(): Saved {
   const vw = window.innerWidth
   const vh = window.innerHeight
-  const fallback: Saved = {
-    x: vw - 440 - 24,
-    y: 72,
-    w: 440,
-    h: 300,
-    dock: null,
-    home: { x: vw - 440 - 24, y: 72 },
-    views: {},
-  }
+  let w = 440
+  let h = 300
+  let home = { x: vw - 440 - 24, y: 72 }
+  let views: Record<string, View> = {}
+  let dock: Dock = 'right'
   try {
     const raw = localStorage.getItem(KEY)
-    if (!raw) return fallback
-    const s = JSON.parse(raw) as Saved
-    if (!s.w || !s.h) return fallback
-    const w = clamp(s.w, MIN_W, vw - 16)
-    const h = clamp(s.h, MIN_H, vh - 16)
-    const next = { ...fallback, ...s, w, h, views: s.views ?? {} }
-    const side = next.dock ?? pickDock(next.x, next.y, w, h, 0, 0)
-    if (side) return { ...next, ...park(side, w, h), dock: side }
-    return {
-      ...next,
-      x: clamp(next.x, 16, vw - w - 16),
-      y: clamp(next.y, 16, vh - h - 16),
+    if (raw) {
+      const s = JSON.parse(raw) as Saved
+      if (s.w && s.h) {
+        w = clamp(s.w, MIN_W, vw - 16)
+        h = clamp(s.h, MIN_H, vh - 16)
+        home = {
+          x: clamp(s.home?.x ?? home.x, 16, vw - w - 16),
+          y: clamp(s.home?.y ?? home.y, 16, vh - h - 16),
+        }
+        views = s.views ?? {}
+        dock = s.dock ?? 'right'
+      }
     }
   } catch {
-    return fallback
+    /* keep defaults */
   }
+  return { ...park(dock, w, h), w, h, dock, home, views }
 }
 
 function save(s: Saved) {

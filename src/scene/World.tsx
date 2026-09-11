@@ -42,7 +42,7 @@ export function World({
         mieDirectionalG={0.7}
       />
       <Terrain />
-      <Beacons current={index} flying={flying} />
+      <Beacons current={index} />
       <WorldSlide
         index={index}
         started={started}

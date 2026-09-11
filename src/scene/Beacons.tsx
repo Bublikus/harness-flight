@@ -1,5 +1,4 @@
 import { useMemo } from 'react'
-import { Html } from '@react-three/drei'
 import { SLIDES, WAYPOINT_SPACING } from '../slides'
 import { blockMaterials } from './blockTextures'
 
@@ -29,7 +28,7 @@ function Block({
   )
 }
 
-export function Beacons({ current, flying }: { current: number; flying: boolean }) {
+export function Beacons({ current }: { current: number }) {
   return (
     <group>
       {SLIDES.map((s, i) => {
@@ -43,11 +42,6 @@ export function Beacons({ current, flying }: { current: number; flying: boolean 
             <Block p={[0, POST - 0.7, 0]} s={[2.6, 0.45, 0.65]} kind="darkOak" />
             <Block p={[0, POST, 0]} s={[1.35, 1.35, 1.35]} kind={on ? 'glowstone' : 'lanternOff'} />
             <Block p={[0, POST + 0.8, 0]} s={[1.7, 0.25, 1.7]} kind="darkOak" />
-            {!flying && (
-              <Html position={[0, POST + 1.55, 0]} center distanceFactor={28}>
-                <div className="beacon-label">{String(i + 1).padStart(2, '0')}</div>
-              </Html>
-            )}
           </group>
         )
       })}

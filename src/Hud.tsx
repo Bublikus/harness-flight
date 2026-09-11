@@ -91,9 +91,6 @@ function FlightPad({
       >
         ←
       </button>
-      <button type="button" className="pad-center" disabled aria-label="Flight control center">
-        ◆
-      </button>
       <button
         type="button"
         className="pad-right"

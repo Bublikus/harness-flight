@@ -87,9 +87,9 @@ canvas {
   display: grid;
   grid-template-areas:
     '. up .'
-    'left center right'
-    '. down .';
-  gap: 5px;
+    'left down right';
+  column-gap: 5px;
+  row-gap: 2px;
   justify-content: center;
 }
 
@@ -106,16 +106,6 @@ canvas {
 
 .pad-left {
   grid-area: left;
-}
-
-.pad-center {
-  grid-area: center;
-  font-size: 10px !important;
-}
-
-.pad-center:disabled {
-  opacity: 1;
-  cursor: default;
 }
 
 .pad-right {
@@ -184,14 +174,6 @@ button:active:not(:disabled) {
 
 .dot.done {
   background: #8fd15a;
-}
-
-.beacon-label {
-  font-family: 'Press Start 2P', monospace;
-  font-size: 8px;
-  color: #fff;
-  text-shadow: 1px 1px 0 #000;
-  pointer-events: none;
 }
 
 .title-screen {
