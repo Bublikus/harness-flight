@@ -22,7 +22,7 @@ function Block({
 }) {
   const material = useMemo(() => blockMaterials(kind, s), [kind, s])
   return (
-    <mesh position={p} material={material}>
+    <mesh position={p} material={material} receiveShadow>
       <boxGeometry args={s} />
     </mesh>
   )

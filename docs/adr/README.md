@@ -22,6 +22,8 @@ Index of lasting presentation choices. Procedure: `adr` skill.
 | [0016](0016-slide-assist-overlay.md) | Draggable slide-assist overlay | Accepted |
 | [0017](0017-boids-flocks-world-ambience.md) | Boids flocks as world ambience | Superseded by ADR-0018 |
 | [0018](0018-distributed-bird-agents.md) | Distributed bird agents with local flocks and perches | Accepted |
+| [0019](0019-corridor-flybys-plane-slide.md) | Corridor flybys between plane and slide | Accepted |
+| [0020](0020-directional-shadow-maps.md) | Directional shadow maps for bird silhouettes | Accepted |
 
 Restore a talk version with `git log --oneline` then `git checkout <commit>`:
 

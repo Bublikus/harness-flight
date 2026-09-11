@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { Plane } from './Plane'
 import { waypointPos } from './Beacons'
+import { planePose } from './worldPoses'
 
 export type TurnDirection = -1 | 0 | 1
 
@@ -134,6 +135,9 @@ export function Flight({
       g.rotation.z += (0 - g.rotation.z) * (1 - Math.exp(-d * 3))
       g.rotation.x += (0 - g.rotation.x) * (1 - Math.exp(-d * 3))
     }
+
+    planePose.pos.copy(g.position)
+    planePose.valid = true
 
     cameraYaw.current = wrapPi(
       cameraYaw.current +

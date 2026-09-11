@@ -14,7 +14,7 @@ function Voxel({
 }) {
   const material = useMemo(() => blockMaterials(kind, s), [kind, s])
   return (
-    <mesh position={p} material={material}>
+    <mesh position={p} material={material} castShadow receiveShadow>
       <boxGeometry args={s} />
     </mesh>
   )
@@ -38,7 +38,7 @@ export function Plane() {
       <Voxel p={[0, 0.85, 0.15]} s={[4.2, 0.12, 0.8]} kind="planeCream" />
       <Voxel p={[-2.7, 0.05, 0.1]} s={[0.2, 0.7, 0.2]} kind="planeDark" />
       <Voxel p={[2.7, 0.05, 0.1]} s={[0.2, 0.7, 0.2]} kind="planeDark" />
-      <mesh ref={prop} position={[0, 0.1, 2.45]} material={propMat}>
+      <mesh ref={prop} position={[0, 0.1, 2.45]} material={propMat} castShadow receiveShadow>
         <boxGeometry args={[0.12, 1.6, 0.12]} />
       </mesh>
       <Voxel p={[0, 0.1, 2.55]} s={[0.22, 0.22, 0.22]} kind="gold" />

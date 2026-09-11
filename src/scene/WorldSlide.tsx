@@ -5,6 +5,7 @@ import { getSlideArt } from '../SlideArt'
 import { SLIDES, type Slide } from '../slides'
 import { waypointPos } from './Beacons'
 import { blockMaterials } from './blockTextures'
+import { slidePose } from './worldPoses'
 
 const WIDTH = 16
 const HEIGHT = 7.5
@@ -178,6 +179,10 @@ function WorldSlideCard({
       card.visible = false
       rise.current = 0
       velocity.current = 0
+      if (active) {
+        slidePose.valid = false
+        slidePose.rise = 0
+      }
       if (!active) onExited()
       return
     }
@@ -194,6 +199,25 @@ function WorldSlideCard({
     const targetScale = THREE.MathUtils.clamp(worldWidth * 0.86 / WIDTH, 0.46, 1)
     scale.current = THREE.MathUtils.damp(scale.current, targetScale, 8, d)
     card.scale.setScalar(scale.current)
+
+    if (active) {
+      card.updateWorldMatrix(true, false)
+      card.getWorldPosition(slidePose.pos)
+      // Local axes → world (board faces +Z toward the audience / plane).
+      slidePose.right.set(1, 0, 0).transformDirection(card.matrixWorld)
+      slidePose.up.set(0, 1, 0).transformDirection(card.matrixWorld)
+      slidePose.normal.set(0, 0, 1).transformDirection(card.matrixWorld)
+      const s = scale.current
+      slidePose.half.set(
+        ((WIDTH + 0.5) * 0.5) * s,
+        ((HEIGHT + 0.5) * 0.5) * s,
+        // Thicker than the 0.34 visual slab so a max-dt bird step cannot tunnel either face.
+        Math.max(0.85, 0.17 * s + 0.7),
+      )
+      slidePose.rise = rise.current
+      // Stay solid while the mesh is still up (sinking / departing included).
+      slidePose.valid = rise.current > 0.08
+    }
   })
 
   return (
@@ -203,12 +227,17 @@ function WorldSlideCard({
       rotation={[0, pose.rotation, 0]}
       visible={false}
     >
-      <mesh material={frame}>
+      <mesh material={frame} castShadow receiveShadow>
         <boxGeometry args={[WIDTH + 0.5, HEIGHT + 0.5, 0.34]} />
       </mesh>
       <mesh position={[0, 0, 0.18]}>
         <planeGeometry args={[WIDTH, HEIGHT]} />
         <meshBasicMaterial map={texture} toneMapped={false} />
+      </mesh>
+      {/* Catch bird/plane shadows without dunking slide copy under Lambert lighting. */}
+      <mesh position={[0, 0, 0.185]} receiveShadow>
+        <planeGeometry args={[WIDTH, HEIGHT]} />
+        <shadowMaterial transparent opacity={0.42} />
       </mesh>
     </group>
   )

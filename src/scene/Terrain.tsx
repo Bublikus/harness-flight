@@ -218,6 +218,8 @@ function Instanced({ data }: { data: Bucket }) {
     }
     if (m.instanceColor) m.instanceColor.needsUpdate = true
     m.frustumCulled = false
+    m.receiveShadow = true
+    // Ground / canopy take bird shadows; skip casting (thousands of instances).
     return m
   }, [data])
 

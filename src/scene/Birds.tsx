@@ -4,8 +4,9 @@ import * as THREE from 'three'
 import { SLIDES, WAYPOINT_SPACING } from '../slides'
 import { blockMaterials } from './blockTextures'
 import { terrainHeight, treePerches } from './Terrain'
+import { planePose, slidePose } from './worldPoses'
 
-/** Scattered agents · small local flocks · optional tree perches. */
+/** Scattered agents · small local flocks · optional tree perches · rare slide flybys. */
 const COUNT = 34
 const X_MAX = 17
 const Z_MIN = -6
@@ -27,9 +28,25 @@ const PERCH_CHANCE = 0.018
 const LAND_R = 0.12
 const ALT_LIFT = 7
 const SEP_MIN_D = 0.4
+const FLYBY_COOLDOWN = 5
+const FLYBY_NEAR = 52
+const FLYBY_SPEED = 9.2
+/** Biplane AABB ≈ wings 5.6 × fuselage ~5.1 × height ~1.5 → enclosing r≈3.9; keep agents clear. */
+const PLANE_R = 5.4
+const PLANE_HARD = 4.6
+const PLANE_REP = 5.8
+/** Inflate slide half-extents; collide while the mesh is still visibly risen. */
+const SLIDE_RISE_BLOCK = 0.08
+const SLIDE_PAD = 0.9
+const SLIDE_HARD = 0.85
+const SLIDE_REP = 6.4
+const SLIDE_SHELL = 2.8
+const CORRIDOR_PLANE = 5.6
+const CORRIDOR_SLIDE = 2.2
+const RESOLVE = 0.55
 
 type Purpose = 'wander' | 'forage' | 'commute' | 'solo'
-type Phase = 'fly' | 'approach' | 'perch'
+type Phase = 'fly' | 'approach' | 'perch' | 'flyby'
 
 type Bird = {
   p: THREE.Vector3
@@ -44,6 +61,13 @@ type Bird = {
   retargetAt: number
   minSp: number
   maxSp: number
+  /** Cubic Bezier control points + param (only while mode === 'flyby'). */
+  c0: THREE.Vector3
+  c1: THREE.Vector3
+  c2: THREE.Vector3
+  c3: THREE.Vector3
+  u: number
+  arc: number
 }
 
 function rnd(a: number, b: number) {
@@ -95,6 +119,12 @@ function seedBirds(perches: { x: number; y: number; z: number }[]): Bird[] {
       retargetAt: rnd(2, 9),
       minSp,
       maxSp,
+      c0: new THREE.Vector3(),
+      c1: new THREE.Vector3(),
+      c2: new THREE.Vector3(),
+      c3: new THREE.Vector3(),
+      u: 0,
+      arc: 1,
     })
   }
   // Nudge a few onto nearby perches so the world isn't empty of perched birds at t=0.
@@ -147,6 +177,295 @@ function nearestPerch(
   return best
 }
 
+/** Cubic Bezier B(t). */
+function bezier(
+  p0: THREE.Vector3,
+  p1: THREE.Vector3,
+  p2: THREE.Vector3,
+  p3: THREE.Vector3,
+  t: number,
+  out: THREE.Vector3,
+) {
+  const u = 1 - t
+  const uu = u * u
+  const tt = t * t
+  return out
+    .set(0, 0, 0)
+    .addScaledVector(p0, uu * u)
+    .addScaledVector(p1, 3 * uu * t)
+    .addScaledVector(p2, 3 * u * tt)
+    .addScaledVector(p3, tt * t)
+}
+
+/** B'(t) for tangent / velocity. */
+function bezierDeriv(
+  p0: THREE.Vector3,
+  p1: THREE.Vector3,
+  p2: THREE.Vector3,
+  p3: THREE.Vector3,
+  t: number,
+  out: THREE.Vector3,
+  scratch: THREE.Vector3,
+) {
+  const u = 1 - t
+  out.set(0, 0, 0)
+  out.addScaledVector(scratch.copy(p1).sub(p0), 3 * u * u)
+  out.addScaledVector(scratch.copy(p2).sub(p1), 6 * u * t)
+  out.addScaledVector(scratch.copy(p3).sub(p2), 3 * t * t)
+  return out
+}
+
+function approxArc(
+  p0: THREE.Vector3,
+  p1: THREE.Vector3,
+  p2: THREE.Vector3,
+  p3: THREE.Vector3,
+  scratch: THREE.Vector3,
+  prev: THREE.Vector3,
+) {
+  let len = 0
+  bezier(p0, p1, p2, p3, 0, prev)
+  for (let i = 1; i <= 12; i++) {
+    bezier(p0, p1, p2, p3, i / 12, scratch)
+    len += scratch.distanceTo(prev)
+    prev.copy(scratch)
+  }
+  return Math.max(len, 1)
+}
+
+function softFloor(b: Bird, t: number) {
+  const floor = terrainHeight(b.p.x, b.p.z) + CLEARANCE
+  if (b.p.y < floor) {
+    b.p.y += Math.min(floor - b.p.y, ALT_LIFT * t)
+    if (b.v.y < 0) b.v.y *= 0.25
+  }
+}
+
+/** Soft sphere push off the biplane (Plane.tsx voxel bounds). */
+function planeForce(
+  p: THREE.Vector3,
+  out: THREE.Vector3,
+  scratch: THREE.Vector3,
+) {
+  out.set(0, 0, 0)
+  if (!planePose.valid) return out
+  scratch.copy(p).sub(planePose.pos)
+  const d = scratch.length()
+  if (d >= PLANE_R || d < 1e-5) return out
+  scratch.multiplyScalar(1 / d)
+  const w = (1 - d / PLANE_R) ** 2
+  return out.copy(scratch).multiplyScalar(PLANE_REP * w)
+}
+
+function slideLive() {
+  return slidePose.valid && slidePose.rise >= SLIDE_RISE_BLOCK
+}
+
+function audienceFace(scratch: THREE.Vector3) {
+  return slidePose.normal.dot(scratch.copy(planePose.pos).sub(slidePose.pos)) > 0 ? 1 : -1
+}
+
+function toSlideLocal(p: THREE.Vector3, out: THREE.Vector3, scratch: THREE.Vector3) {
+  scratch.copy(p).sub(slidePose.pos)
+  return out.set(scratch.dot(slidePose.right), scratch.dot(slidePose.up), scratch.dot(slidePose.normal))
+}
+
+/** Soft OBB push — same clearance on both faces; eject along the current-side normal. */
+function slideForce(
+  p: THREE.Vector3,
+  v: THREE.Vector3,
+  out: THREE.Vector3,
+  scratch: THREE.Vector3,
+  local: THREE.Vector3,
+) {
+  out.set(0, 0, 0)
+  if (!slideLive()) return out
+  const { half, right, up, normal } = slidePose
+  toSlideLocal(p, local, scratch)
+  const hx = half.x + SLIDE_PAD
+  const hy = half.y + SLIDE_PAD
+  const hz = half.z + SLIDE_PAD
+  const onFace = Math.abs(local.x) <= hx && Math.abs(local.y) <= hy
+  const side = local.z >= 0 ? 1 : -1
+  const absZ = Math.abs(local.z)
+  if (onFace) {
+    if (absZ <= hz) {
+      out.copy(normal).multiplyScalar(side * SLIDE_REP * (1 + (1 - (hz - absZ) / Math.max(hz, 1e-4))))
+      return out
+    }
+    const gap = absZ - hz
+    if (gap < SLIDE_SHELL) {
+      const approaching = v.dot(normal) * side < 0
+      const w = (1 - gap / SLIDE_SHELL) ** 2 * (approaching ? 1.55 : 1)
+      out.copy(normal).multiplyScalar(side * SLIDE_REP * 0.9 * w)
+      return out
+    }
+    return out
+  }
+  const cx = THREE.MathUtils.clamp(local.x, -hx, hx)
+  const cy = THREE.MathUtils.clamp(local.y, -hy, hy)
+  const cz = THREE.MathUtils.clamp(local.z, -hz, hz)
+  out
+    .set(0, 0, 0)
+    .addScaledVector(right, local.x - cx)
+    .addScaledVector(up, local.y - cy)
+    .addScaledVector(normal, local.z - cz)
+  const d = out.length()
+  if (d >= SLIDE_SHELL || d < 1e-5) {
+    out.set(0, 0, 0)
+    return out
+  }
+  out.multiplyScalar(((1 - d / SLIDE_SHELL) ** 2 * SLIDE_REP * 0.85) / d)
+  return out
+}
+
+/** Nudge position out of solids without a hard teleport. */
+function softResolve(
+  p: THREE.Vector3,
+  scratch: THREE.Vector3,
+  local: THREE.Vector3,
+  t: number,
+) {
+  if (planePose.valid) {
+    scratch.copy(p).sub(planePose.pos)
+    const d = scratch.length()
+    if (d < PLANE_HARD && d > 1e-5) {
+      scratch.multiplyScalar((PLANE_HARD - d) * RESOLVE * Math.min(1, t * 14) / d)
+      p.add(scratch)
+    } else if (d < 1e-5) {
+      p.y += PLANE_HARD * RESOLVE * 0.5
+    }
+  }
+  if (!slideLive()) return
+  const { half, normal } = slidePose
+  toSlideLocal(p, local, scratch)
+  const hx = half.x + SLIDE_HARD
+  const hy = half.y + SLIDE_HARD
+  const hz = half.z + SLIDE_HARD
+  if (Math.abs(local.x) > hx || Math.abs(local.y) > hy || Math.abs(local.z) > hz) return
+  // Out the current face — never the shallow lateral axis through the thin slab.
+  const k = Math.min(1, t * 16)
+  p.addScaledVector(normal, (local.z >= 0 ? 1 : -1) * (hz - Math.abs(local.z)) * k)
+}
+
+/** Swept test: if prev→curr pierces the board, stay on the entry side. */
+function slideSweep(
+  prev: THREE.Vector3,
+  curr: THREE.Vector3,
+  vel: THREE.Vector3,
+  scratch: THREE.Vector3,
+  local: THREE.Vector3,
+  prevL: THREE.Vector3,
+) {
+  if (!slideLive()) return
+  const { half, normal } = slidePose
+  const hx = half.x + SLIDE_HARD
+  const hy = half.y + SLIDE_HARD
+  const hz = half.z + SLIDE_HARD
+  toSlideLocal(prev, prevL, scratch)
+  toSlideLocal(curr, local, scratch)
+  let hit = Math.abs(local.x) <= hx && Math.abs(local.y) <= hy && Math.abs(local.z) <= hz
+  if (!hit && prevL.z * local.z <= 0) {
+    const dz = local.z - prevL.z
+    if (Math.abs(dz) > 1e-8) {
+      const t0 = -prevL.z / dz
+      if (t0 >= 0 && t0 <= 1) {
+        const x0 = prevL.x + (local.x - prevL.x) * t0
+        const y0 = prevL.y + (local.y - prevL.y) * t0
+        hit = Math.abs(x0) <= hx && Math.abs(y0) <= hy
+      }
+    }
+  }
+  if (!hit) return
+  const side = prevL.z >= 0 ? 1 : -1
+  curr.addScaledVector(normal, side * (hz + 0.06) - local.z)
+  const inward = vel.dot(normal) * side
+  if (inward < 0) vel.addScaledVector(normal, -inward * side)
+}
+
+/** Keep a path node on this face of the board (no cross-canvas control points). */
+function pinToFace(
+  p: THREE.Vector3,
+  face: number,
+  clear: number,
+  scratch: THREE.Vector3,
+  local: THREE.Vector3,
+) {
+  if (!slideLive()) return
+  const { half, normal } = slidePose
+  toSlideLocal(p, local, scratch)
+  if (Math.abs(local.x) > half.x + SLIDE_PAD || Math.abs(local.y) > half.y + SLIDE_PAD) return
+  const need = face * (half.z + clear)
+  if (local.z * face >= half.z + clear) return
+  p.addScaledVector(normal, need - local.z)
+}
+
+/** If p→goal would pierce the board, cancel the through component and steer around. */
+function slideDetour(
+  p: THREE.Vector3,
+  goal: THREE.Vector3,
+  steer: THREE.Vector3,
+  scratch: THREE.Vector3,
+  local: THREE.Vector3,
+  goalL: THREE.Vector3,
+) {
+  if (!slideLive()) return
+  const { half, right, up, normal } = slidePose
+  toSlideLocal(p, local, scratch)
+  toSlideLocal(goal, goalL, scratch)
+  if (local.z * goalL.z > 0 && Math.abs(local.z) > half.z && Math.abs(goalL.z) > half.z) return
+  const dz = goalL.z - local.z
+  if (Math.abs(dz) < 1e-8) return
+  const t0 = -local.z / dz
+  if (t0 < 0 || t0 > 1) return
+  const hx = half.x + 0.4
+  const hy = half.y + 0.4
+  const x0 = local.x + (goalL.x - local.x) * t0
+  const y0 = local.y + (goalL.y - local.y) * t0
+  if (Math.abs(x0) > hx || Math.abs(y0) > hy) return
+  const side = local.z >= 0 ? 1 : -1
+  const inward = steer.dot(normal) * side
+  if (inward < 0) steer.addScaledVector(normal, -inward)
+  const dx = hx + 1.5 - Math.abs(local.x)
+  const dy = hy + 1.5 - Math.abs(local.y)
+  if (dy < dx) steer.addScaledVector(up, (local.y >= 0 ? 1 : -1) * 2.4)
+  else steer.addScaledVector(right, (local.x >= 0 ? 1 : -1) * 2.4)
+}
+
+/**
+ * Mid-point in the open-air corridor between plane and slide:
+ * between them along the chord, clear of both solids, on the audience side of the board.
+ */
+function corridorMid(
+  out: THREE.Vector3,
+  axis: THREE.Vector3,
+  scratch: THREE.Vector3,
+) {
+  axis.copy(slidePose.pos).sub(planePose.pos)
+  const span = axis.length()
+  if (span < 1e-4) axis.copy(slidePose.normal)
+  else axis.multiplyScalar(1 / span)
+
+  const face = audienceFace(scratch)
+  const front = slidePose.half.z + CORRIDOR_SLIDE
+  // Audience-side stand-off, then blend toward the plane clearance shell along the chord.
+  out.copy(slidePose.pos).addScaledVector(slidePose.normal, face * front)
+  scratch.copy(planePose.pos).addScaledVector(axis, CORRIDOR_PLANE)
+  if (span > CORRIDOR_PLANE + front + 1) {
+    out.lerp(scratch, 0.42)
+  } else {
+    // Tight gap: stay on the board face and step sideways clear of the plane.
+    out.addScaledVector(slidePose.right, (Math.random() < 0.5 ? 1 : -1) * rnd(2.5, 4.5))
+  }
+  out.addScaledVector(slidePose.up, rnd(0.3, 1.5))
+  out.addScaledVector(slidePose.right, rnd(-1.6, 1.6))
+  softResolve(out, scratch, axis, 1)
+  softResolve(out, scratch, axis, 1)
+  const floor = terrainHeight(out.x, out.z) + CLEARANCE + 0.5
+  if (out.y < floor) out.y = floor
+  return out
+}
+
 export function Birds() {
   const perches = useMemo(treePerches, [])
   const birds = useMemo(() => seedBirds(perches), [perches])
@@ -160,8 +479,17 @@ export function Birds() {
   const ali = useMemo(() => new THREE.Vector3(), [])
   const coh = useMemo(() => new THREE.Vector3(), [])
   const tmp = useMemo(() => new THREE.Vector3(), [])
+  const tmp2 = useMemo(() => new THREE.Vector3(), [])
+  const mid = useMemo(() => new THREE.Vector3(), [])
   const aim = useMemo(() => new THREE.Vector3(), [])
+  const axis = useMemo(() => new THREE.Vector3(), [])
+  const local = useMemo(() => new THREE.Vector3(), [])
+  const prev = useMemo(() => new THREE.Vector3(), [])
+  const prevL = useMemo(() => new THREE.Vector3(), [])
+  const goalL = useMemo(() => new THREE.Vector3(), [])
+  const avoid = useMemo(() => new THREE.Vector3(), [])
   const occupied = useMemo(() => new Set<number>(), [])
+  const nextFlybyAt = useRef(4)
   const bodyMat = useMemo(() => blockMaterials('hat') as THREE.Material, [])
   const wingMat = useMemo(() => blockMaterials('planeDark') as THREE.Material, [])
   const beakMat = useMemo(() => blockMaterials('gold') as THREE.Material, [])
@@ -188,10 +516,97 @@ export function Birds() {
       }
     }
 
+    // ~1 flyby / 5s through the plane↔slide corridor when a board is up.
+    let flybyBusy = false
+    for (const b of birds) {
+      if (b.mode === 'flyby') {
+        flybyBusy = true
+        break
+      }
+    }
+    if (
+      !flybyBusy &&
+      time >= nextFlybyAt.current &&
+      planePose.valid &&
+      slidePose.valid &&
+      slidePose.rise > 0.45
+    ) {
+      corridorMid(mid, axis, tmp)
+      const face = audienceFace(tmp2)
+      let best = -1
+      let bestD = FLYBY_NEAR
+      for (let i = 0; i < birds.length; i++) {
+        const b = birds[i]
+        if (b.mode !== 'fly') continue
+        // Front-of-board only — a back-side start would cross the canvas to reach mid.
+        const along = slidePose.normal.dot(tmp.copy(b.p).sub(slidePose.pos))
+        if (along * face < slidePose.half.z + 0.4) continue
+        const d = b.p.distanceTo(mid)
+        if (d < bestD && d > 6) {
+          bestD = d
+          best = i
+        }
+      }
+      if (best >= 0) {
+        const b = birds[best]
+        const chord = b.p.distanceTo(mid)
+        const heading = tmp.copy(b.v)
+        if (heading.lengthSq() < 1e-4) heading.set(1, 0, 0)
+        else heading.normalize()
+        // Exit laterally along the board, staying on the audience side (not through canvas).
+        const side = Math.random() < 0.5 ? 1 : -1
+        const front = slidePose.half.z + CORRIDOR_SLIDE
+
+        b.c0.copy(b.p)
+        b.c1.copy(b.p).addScaledVector(heading, Math.min(14, chord * 0.38))
+        // Approach mid from the plane side of the corridor.
+        b.c2.copy(mid).addScaledVector(slidePose.normal, face * 0.6)
+        b.c2.addScaledVector(slidePose.right, rnd(-1.2, 1.2))
+        // Exit: skim past mid along board right, still clear of the surface.
+        b.c3
+          .copy(mid)
+          .addScaledVector(slidePose.right, side * rnd(11, 17))
+          .addScaledVector(slidePose.up, rnd(0.8, 2.4))
+          .addScaledVector(slidePose.normal, face * (front * 0.35))
+        pinToFace(b.c1, face, CORRIDOR_SLIDE * 0.25, tmp, local)
+        pinToFace(b.c2, face, CORRIDOR_SLIDE * 0.4, tmp, local)
+        pinToFace(b.c3, face, CORRIDOR_SLIDE * 0.25, tmp, local)
+        softResolve(b.c2, tmp, local, 1)
+        softResolve(b.c3, tmp, local, 1)
+        b.u = 0
+        b.arc = approxArc(b.c0, b.c1, b.c2, b.c3, tmp, tmp2)
+        b.mode = 'flyby'
+        nextFlybyAt.current = time + FLYBY_COOLDOWN + rnd(-0.6, 1.2)
+      } else {
+        nextFlybyAt.current = time + 1.2
+      }
+    }
+
     for (let i = 0; i < birds.length; i++) {
       const b = birds[i]
 
-      if (b.mode === 'perch' && b.perch) {
+      if (b.mode === 'flyby') {
+        const du = (FLYBY_SPEED * t) / b.arc
+        b.u = Math.min(1, b.u + du)
+        prev.copy(b.p)
+        bezier(b.c0, b.c1, b.c2, b.c3, b.u, b.p)
+        bezierDeriv(b.c0, b.c1, b.c2, b.c3, b.u, b.v, tmp)
+        const tanLen = b.v.length()
+        if (tanLen > 1e-4) b.v.multiplyScalar(FLYBY_SPEED / tanLen)
+        else b.v.copy(tmp2.copy(b.c3).sub(b.c2)).setLength(FLYBY_SPEED)
+        slideSweep(prev, b.p, b.v, tmp, local, prevL)
+        softResolve(b.p, tmp, local, t)
+        softFloor(b, t)
+        if (b.u >= 1) {
+          b.mode = 'fly'
+          // Hand back: keep exit tangent as cruise speed, new goal ahead.
+          limit(b.v, b.minSp, b.maxSp)
+          b.goal.copy(b.p).addScaledVector(tmp.copy(b.v).normalize(), rnd(18, 32))
+          const floor = terrainHeight(b.goal.x, b.goal.z) + CLEARANCE
+          b.goal.y = THREE.MathUtils.clamp(b.goal.y, floor + 1, floor + ALT_PAD - 1)
+          b.retargetAt = time + rnd(4, 12)
+        }
+      } else if (b.mode === 'perch' && b.perch) {
         // Soft settle — remaining gap is at most LAND_R after approach.
         b.p.lerp(b.perch, Math.min(1, t * 10))
         b.v.set(0.02, 0, 0.01)
@@ -216,8 +631,16 @@ export function Birds() {
           // Arrive: slow as distance shrinks — continuous integrate, no snap.
           const desired = Math.min(b.minSp * 0.9, Math.max(0.35, d * 1.6))
           steer.copy(tmp).multiplyScalar(desired / d)
+          planeForce(b.p, avoid, tmp2)
+          steer.add(avoid)
+          slideForce(b.p, b.v, avoid, tmp2, local)
+          steer.add(avoid)
+          slideDetour(b.p, b.perch, steer, tmp2, local, goalL)
           b.v.lerp(steer, Math.min(1, t * 3.2))
+          prev.copy(b.p)
           b.p.addScaledVector(b.v, t)
+          slideSweep(prev, b.p, b.v, tmp, local, prevL)
+          softResolve(b.p, tmp, local, t)
         }
       } else {
         if (time > b.retargetAt || b.p.distanceToSquared(b.goal) < 9) {
@@ -290,14 +713,19 @@ export function Birds() {
         if (b.p.y < floor) steer.y += BOUND_W * 1.7
         else if (b.p.y > ceiling) steer.y -= BOUND_W
 
+        planeForce(b.p, avoid, tmp)
+        steer.add(avoid)
+        slideForce(b.p, b.v, avoid, tmp, local)
+        steer.add(avoid)
+        slideDetour(b.p, b.goal, steer, tmp, local, goalL)
+
         b.v.addScaledVector(steer, t)
         limit(b.v, b.minSp, b.maxSp)
+        prev.copy(b.p)
         b.p.addScaledVector(b.v, t)
-        // Soft altitude — terrainHeight is stepped (Math.round); never snap Y.
-        if (b.p.y < floor) {
-          b.p.y += Math.min(floor - b.p.y, ALT_LIFT * t)
-          if (b.v.y < 0) b.v.y *= 0.25
-        }
+        slideSweep(prev, b.p, b.v, tmp, local, prevL)
+        softResolve(b.p, tmp, local, t)
+        softFloor(b, t)
       }
 
       const speed = Math.max(b.v.length(), 0.05)
@@ -314,7 +742,7 @@ export function Birds() {
       dummy.updateMatrix()
       beak.setMatrixAt(i, dummy.matrix)
 
-      const flapAmp = b.mode === 'perch' ? 0.18 : 0.75
+      const flapAmp = b.mode === 'perch' ? 0.18 : b.mode === 'flyby' ? 0.95 : 0.75
       const flapHz = b.mode === 'perch' ? 4.5 : 9 + speed * 0.35
       const flap = Math.sin(time * flapHz + b.phase) * flapAmp
       const bank = THREE.MathUtils.clamp(-b.v.x * 0.08, -0.35, 0.35)
@@ -342,16 +770,40 @@ export function Birds() {
 
   return (
     <group>
-      <instancedMesh ref={bodyRef} args={[undefined, undefined, COUNT]} frustumCulled={false} material={bodyMat}>
+      <instancedMesh
+        ref={bodyRef}
+        args={[undefined, undefined, COUNT]}
+        frustumCulled={false}
+        castShadow
+        material={bodyMat}
+      >
         <boxGeometry args={[0.7, 0.34, 0.9]} />
       </instancedMesh>
-      <instancedMesh ref={beakRef} args={[undefined, undefined, COUNT]} frustumCulled={false} material={beakMat}>
+      <instancedMesh
+        ref={beakRef}
+        args={[undefined, undefined, COUNT]}
+        frustumCulled={false}
+        castShadow
+        material={beakMat}
+      >
         <boxGeometry args={[0.2, 0.14, 0.28]} />
       </instancedMesh>
-      <instancedMesh ref={wingLRef} args={[undefined, undefined, COUNT]} frustumCulled={false} material={wingMat}>
+      <instancedMesh
+        ref={wingLRef}
+        args={[undefined, undefined, COUNT]}
+        frustumCulled={false}
+        castShadow
+        material={wingMat}
+      >
         <boxGeometry args={[1.05, 0.1, 0.42]} />
       </instancedMesh>
-      <instancedMesh ref={wingRRef} args={[undefined, undefined, COUNT]} frustumCulled={false} material={wingMat}>
+      <instancedMesh
+        ref={wingRRef}
+        args={[undefined, undefined, COUNT]}
+        frustumCulled={false}
+        castShadow
+        material={wingMat}
+      >
         <boxGeometry args={[1.05, 0.1, 0.42]} />
       </instancedMesh>
     </group>
