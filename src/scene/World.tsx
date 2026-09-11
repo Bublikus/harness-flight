@@ -1,6 +1,5 @@
-import { useRef } from 'react'
+import { useMemo, useRef } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { Sky } from '@react-three/drei'
 import * as THREE from 'three'
 import { Terrain } from './Terrain'
 import { Beacons } from './Beacons'
@@ -16,6 +15,56 @@ import { planePose } from './worldPoses'
 const SUN = new THREE.Vector3(-34, 52, -38).normalize()
 const SUN_DIST = 55
 const SHADOW_EXTENT = 36
+
+/** Soft Minecraft sky: color by view elevation only — no cube-face seams. */
+function SoftSky() {
+  const mesh = useRef<THREE.Mesh>(null)
+  const material = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        depthWrite: false,
+        fog: false,
+        uniforms: {
+          topColor: { value: new THREE.Color('#f3e0c4') },
+          horizonColor: { value: new THREE.Color('#4a9ae8') },
+        },
+        vertexShader: /* glsl */ `
+          varying vec3 vWorldPosition;
+          void main() {
+            vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+            vWorldPosition = worldPosition.xyz;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            gl_Position.z = gl_Position.w;
+          }
+        `,
+        fragmentShader: /* glsl */ `
+          uniform vec3 topColor;
+          uniform vec3 horizonColor;
+          varying vec3 vWorldPosition;
+          void main() {
+            vec3 dir = normalize(vWorldPosition - cameraPosition);
+            // Narrow band: white only near the horizon; mid/zenith stay blue.
+            float t = pow(smoothstep(-0.05, 0.28, dir.y), 0.72);
+            gl_FragColor = vec4(mix(horizonColor, topColor, t), 1.0);
+            #include <tonemapping_fragment>
+            #include <colorspace_fragment>
+          }
+        `,
+      }),
+    [],
+  )
+
+  useFrame(({ camera }) => {
+    mesh.current?.position.copy(camera.position)
+  })
+
+  return (
+    <mesh ref={mesh} scale={80} material={material} frustumCulled={false}>
+      <sphereGeometry args={[1, 32, 16]} />
+    </mesh>
+  )
+}
 
 function SunLight() {
   const light = useRef<THREE.DirectionalLight>(null)
@@ -87,17 +136,11 @@ export function World({
       dpr={[1, 1.5]}
       onCreated={({ camera }) => camera.lookAt(0, 11.5, 8)}
     >
-      <color attach="background" args={['#9fd6f7']} />
-      <fog attach="fog" args={['#a8d8f5', 75, 190]} />
+      <color attach="background" args={['#f3e0c4']} />
+      <fog attach="fog" args={['#e8d4b8', 75, 190]} />
       <hemisphereLight args={['#c8e8ff', '#6a8a4a', 0.95]} />
       <SunLight />
-      <Sky
-        sunPosition={[-34, 52, -38]}
-        turbidity={2.2}
-        rayleigh={0.35}
-        mieCoefficient={0.003}
-        mieDirectionalG={0.7}
-      />
+      <SoftSky />
       <Terrain />
       <Birds />
       <Beacons current={index} />
