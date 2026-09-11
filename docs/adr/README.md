@@ -14,9 +14,10 @@ Index of lasting presentation choices. Procedure: `adr` skill.
 | [0008](0008-directional-flight-pad.md) | Directional flight pad | Superseded by ADR-0010 |
 | [0009](0009-user-paced-presentation.md) | User-paced presentation | Accepted |
 | [0010](0010-reversible-flight-axis.md) | Reversible flight axis | Accepted |
-| [0011](0011-slide-rises-on-final-approach.md) | Slide rises on final approach | Accepted |
+| [0011](0011-slide-rises-on-final-approach.md) | Slide rises on final approach | Superseded by ADR-0014 |
 | [0012](0012-bidirectional-pagination.md) | Bidirectional pagination | Accepted |
 | [0013](0013-synchronized-speaker-notes.md) | Synchronized speaker notes | Accepted |
+| [0014](0014-world-space-slide-surface.md) | World-space slide surface | Proposed |
 
 Restore a talk version with `git log --oneline` then `git checkout <commit>`:
 

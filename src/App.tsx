@@ -60,7 +60,10 @@ export default function App() {
     <div className="app">
       <World
         index={index}
+        started={started}
         flying={flying}
+        approaching={approaching}
+        facing={facing}
         turnDirection={turnDirection}
         onApproach={() => setApproaching(true)}
         onArrived={() => {
@@ -71,8 +74,6 @@ export default function App() {
       {started ? (
         <Hud
           index={index}
-          flying={flying}
-          approaching={approaching}
           canTurnBack={backIndex !== null}
           upTarget={upTarget}
           downTarget={downTarget}

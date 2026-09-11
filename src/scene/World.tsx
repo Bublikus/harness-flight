@@ -3,16 +3,23 @@ import { Sky } from '@react-three/drei'
 import { Terrain } from './Terrain'
 import { Beacons } from './Beacons'
 import { Flight, type TurnDirection } from './Flight'
+import { WorldSlide } from './WorldSlide'
 
 export function World({
   index,
+  started,
   flying,
+  approaching,
+  facing,
   turnDirection,
   onApproach,
   onArrived,
 }: {
   index: number
+  started: boolean
   flying: boolean
+  approaching: boolean
+  facing: 1 | -1
   turnDirection: TurnDirection
   onApproach: () => void
   onArrived: () => void
@@ -36,6 +43,13 @@ export function World({
       />
       <Terrain />
       <Beacons current={index} flying={flying} />
+      <WorldSlide
+        index={index}
+        started={started}
+        flying={flying}
+        approaching={approaching}
+        facing={facing}
+      />
       <Flight
         index={index}
         flying={flying}

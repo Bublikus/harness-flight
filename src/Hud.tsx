@@ -1,5 +1,4 @@
-import { SLIDES, type Slide } from './slides'
-import { SlideArt } from './SlideArt'
+import { SLIDES } from './slides'
 import './speaker-notes.css'
 
 function openSpeakerNotes() {
@@ -9,28 +8,8 @@ function openSpeakerNotes() {
   window.open(url, 'harness-flight-notes', 'noopener,noreferrer')
 }
 
-export function SignCard({ slide: s }: { slide: Slide }) {
-  return (
-    <div className="sign">
-      <SlideArt key={s.id} id={s.id} />
-      <div className="copy">
-        <p className="era">{s.era}</p>
-        <h1>{s.title}</h1>
-        <p className="lead">{s.lead}</p>
-        <ul>
-          {s.points.map((p) => (
-            <li key={p}>{p}</li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  )
-}
-
 export function Hud({
   index,
-  flying,
-  approaching,
   canTurnBack,
   upTarget,
   downTarget,
@@ -40,8 +19,6 @@ export function Hud({
   onTurnRight,
 }: {
   index: number
-  flying: boolean
-  approaching: boolean
   canTurnBack: boolean
   upTarget: number
   downTarget: number
@@ -50,8 +27,6 @@ export function Hud({
   onTurnLeft: () => void
   onTurnRight: () => void
 }) {
-  const s = SLIDES[index]
-
   return (
     <div className="hud">
       <header className="topbar chrome">
@@ -68,12 +43,6 @@ export function Hud({
           </div>
         </div>
       </header>
-
-      {(!flying || approaching) && (
-        <div className={`hud-card ${flying ? 'rising' : ''}`}>
-          <SignCard slide={s} />
-        </div>
-      )}
 
       <div className="hud-bottom chrome">
         <nav className="flight-pad" aria-label="Flight controls">

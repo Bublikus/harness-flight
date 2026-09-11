@@ -1,6 +1,6 @@
 # ADR-0011: Slide rises on final approach
 
-- Status: Accepted
+- Status: Superseded by ADR-0014
 - Date: 2026-09-11
 - Deciders: this session
 
