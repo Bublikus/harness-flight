@@ -29,9 +29,9 @@ function tex(paint: (set: (x: number, y: number, hex: string) => void) => void) 
   g /= count
   b /= count
   for (let i = 0; i < d.length; i += 4) {
-    d[i] = (d[i] + r) * 0.5
-    d[i + 1] = (d[i + 1] + g) * 0.5
-    d[i + 2] = (d[i + 2] + b) * 0.5
+    d[i] = d[i] * 0.25 + r * 0.75
+    d[i + 1] = d[i + 1] * 0.25 + g * 0.75
+    d[i + 2] = d[i + 2] * 0.25 + b * 0.75
   }
   ctx.putImageData(img, 0, 0)
   const texture = new THREE.CanvasTexture(canvas)

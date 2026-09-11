@@ -184,7 +184,7 @@ function Instanced({ data }: { data: Bucket }) {
     m.instanceMatrix.needsUpdate = true
     const tint = new THREE.Color()
     for (let i = 0; i < data.pos.length; i += 3) {
-      const shade = 0.89 + n2(data.pos[i] + 3, data.pos[i + 2] + 7) * 0.22
+      const shade = 0.945 + n2(data.pos[i] + 3, data.pos[i + 2] + 7) * 0.11
       tint.setRGB(shade, shade, shade)
       m.setColorAt(i / 3, tint)
     }
