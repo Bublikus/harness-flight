@@ -6,6 +6,7 @@ import './assist.css'
 const KEY = 'harness-flight-assist-v1'
 const MIN_W = 280
 const MIN_H = 200
+const ZOOM = 1.12 ** 0.2
 
 type Dock = 'left' | 'right' | 'top' | 'bottom'
 type View = { z: number; x: number; y: number }
@@ -120,6 +121,7 @@ export function AssistOverlay({ index }: { index: number }) {
     cx: number
     cy: number
   } | null>(null)
+  const zoomAim = useRef<(View & { i: number }) | null>(null)
   const indexRef = useRef(index)
   indexRef.current = index
   const src = assistSrc(index)
@@ -127,6 +129,11 @@ export function AssistOverlay({ index }: { index: number }) {
   const [dock, setDock] = useState<Dock | null>(start.dock)
 
   const viewOf = () => pose.current.views[indexRef.current] ?? { z: 1, x: 0, y: 0 }
+
+  const aimOf = (): View => {
+    const a = zoomAim.current
+    return a && a.i === indexRef.current ? a : viewOf()
+  }
 
   const paint = () => {
     const el = root.current
@@ -161,6 +168,22 @@ export function AssistOverlay({ index }: { index: number }) {
       raf = requestAnimationFrame(tick)
       const dt = Math.min(0.04, (now - last) / 1000)
       last = now
+      const a = zoomAim.current
+      if (a && a.i !== indexRef.current) zoomAim.current = null
+      else if (a) {
+        const v = viewOf()
+        const t = 1 - Math.exp(-14 * dt)
+        const next = {
+          z: v.z + (a.z - v.z) * t,
+          x: v.x + (a.x - v.x) * t,
+          y: v.y + (a.y - v.y) * t,
+        }
+        if (Math.abs(a.z - next.z) < 0.002 && Math.hypot(a.x - next.x, a.y - next.y) < 0.5) {
+          writeView({ z: a.z, x: a.x, y: a.y })
+          zoomAim.current = null
+          save(pose.current)
+        } else writeView(next)
+      }
       const p = pose.current
       if (drag.current) return
       if (p.restore && !p.dock) {
@@ -286,13 +309,14 @@ export function AssistOverlay({ index }: { index: number }) {
         const box = node.getBoundingClientRect()
         const cx = (pts[0].x + pts[1].x) / 2 - box.left
         const cy = (pts[0].y + pts[1].y) / 2 - box.top
-        const next = clamp(pin.z * (dist / pin.dist), 0.4, 8)
+        const next = clamp(pin.z * (dist / pin.dist) ** 0.2, 0.4, 8)
         const k = next / pin.z
-        writeView({
+        zoomAim.current = {
+          i: indexRef.current,
           z: next,
           x: cx - (pin.cx - pin.x) * k,
           y: cy - (pin.cy - pin.y) * k,
-        })
+        }
         return
       }
       const d = drag.current
@@ -315,6 +339,11 @@ export function AssistOverlay({ index }: { index: number }) {
       } else if (d.kind === 'pan') {
         const v = viewOf()
         writeView({ ...v, x: v.x + dx, y: v.y + dy })
+        const aim = zoomAim.current
+        if (aim && aim.i === indexRef.current) {
+          aim.x += dx
+          aim.y += dy
+        }
       } else {
         box.w = clamp(box.w + dx, MIN_W, window.innerWidth - 16)
         box.h = clamp(box.h + dy, MIN_H, window.innerHeight - 16)
@@ -349,11 +378,15 @@ export function AssistOverlay({ index }: { index: number }) {
       const box = node.getBoundingClientRect()
       const cx = e.clientX - box.left
       const cy = e.clientY - box.top
-      const v = viewOf()
-      const next = clamp(v.z * (e.deltaY < 0 ? 1.12 : 1 / 1.12), 0.4, 8)
+      const v = aimOf()
+      const next = clamp(v.z * (e.deltaY < 0 ? ZOOM : 1 / ZOOM), 0.4, 8)
       const k = next / v.z
-      writeView({ z: next, x: cx - (cx - v.x) * k, y: cy - (cy - v.y) * k })
-      save(pose.current)
+      zoomAim.current = {
+        i: indexRef.current,
+        z: next,
+        x: cx - (cx - v.x) * k,
+        y: cy - (cy - v.y) * k,
+      }
     }
     node.addEventListener('wheel', onWheel, { passive: false })
     return () => node.removeEventListener('wheel', onWheel)
@@ -391,7 +424,7 @@ export function AssistOverlay({ index }: { index: number }) {
       const box = node.getBoundingClientRect()
       const cx = (pts[0].x + pts[1].x) / 2 - box.left
       const cy = (pts[0].y + pts[1].y) / 2 - box.top
-      const v = viewOf()
+      const v = aimOf()
       pinch.current = { dist, z: v.z, x: v.x, y: v.y, cx, cy }
       return
     }
