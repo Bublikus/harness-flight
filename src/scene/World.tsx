@@ -27,7 +27,7 @@ function SoftSky() {
         fog: false,
         uniforms: {
           topColor: { value: new THREE.Color('#f3e0c4') },
-          horizonColor: { value: new THREE.Color('#4a9ae8') },
+          horizonColor: { value: new THREE.Color('#3d8ad4') },
         },
         vertexShader: /* glsl */ `
           varying vec3 vWorldPosition;
@@ -137,7 +137,7 @@ export function World({
       onCreated={({ camera }) => camera.lookAt(0, 11.5, 8)}
     >
       <color attach="background" args={['#f3e0c4']} />
-      <fog attach="fog" args={['#e8d4b8', 75, 190]} />
+      <fog attach="fog" args={['#6aa8d8', 75, 190]} />
       <hemisphereLight args={['#c8e8ff', '#6a8a4a', 0.95]} />
       <SunLight />
       <SoftSky />
