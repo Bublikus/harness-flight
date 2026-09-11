@@ -22,12 +22,14 @@ export function SignCard({ slide: s }: { slide: Slide }) {
 export function Hud({
   index,
   flying,
+  canTurnBack,
   onForward,
   onTurnLeft,
   onTurnRight,
 }: {
   index: number
   flying: boolean
+  canTurnBack: boolean
   onForward: () => void
   onTurnLeft: () => void
   onTurnRight: () => void
@@ -67,7 +69,7 @@ export function Hud({
             type="button"
             className="pad-left"
             onClick={onTurnLeft}
-            disabled={index === 0}
+            disabled={!canTurnBack}
             aria-label="Turn left and return to previous slide"
           >
             ←
@@ -84,7 +86,7 @@ export function Hud({
             type="button"
             className="pad-right"
             onClick={onTurnRight}
-            disabled={index === 0}
+            disabled={!canTurnBack}
             aria-label="Turn right and return to previous slide"
           >
             →

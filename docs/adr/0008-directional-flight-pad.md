@@ -1,6 +1,6 @@
 # ADR-0008: Directional flight pad
 
-- Status: Accepted
+- Status: Superseded by ADR-0010
 - Date: 2026-09-11
 - Deciders: this session
 

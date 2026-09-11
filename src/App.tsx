@@ -8,6 +8,7 @@ import './index.css'
 export default function App() {
   const [started, setStarted] = useState(false)
   const [index, setIndex] = useState(0)
+  const [backIndex, setBackIndex] = useState<number | null>(null)
   const [flying, setFlying] = useState(false)
   const [turnDirection, setTurnDirection] = useState<TurnDirection>(0)
 
@@ -15,8 +16,17 @@ export default function App() {
     if (next < 0 || next >= SLIDES.length) return
     setFlying(true)
     setTurnDirection(turn)
+    setBackIndex(index)
     setIndex(next)
-  }, [])
+  }, [index])
+
+  const turnBack = useCallback((turn: TurnDirection) => {
+    if (backIndex === null) return
+    setFlying(true)
+    setTurnDirection(turn)
+    setBackIndex(index)
+    setIndex(backIndex)
+  }, [backIndex, index])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -25,12 +35,12 @@ export default function App() {
         if (!started) setStarted(true)
         else go(index + 1)
       }
-      if (e.code === 'ArrowLeft') go(index - 1, 1)
-      if (e.code === 'ArrowRight') go(index - 1, -1)
+      if (e.code === 'ArrowLeft') turnBack(1)
+      if (e.code === 'ArrowRight') turnBack(-1)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [started, index, go])
+  }, [started, index, go, turnBack])
 
   return (
     <div className="app">
@@ -44,9 +54,10 @@ export default function App() {
         <Hud
           index={index}
           flying={flying}
+          canTurnBack={backIndex !== null}
           onForward={() => go(index + 1)}
-          onTurnLeft={() => go(index - 1, 1)}
-          onTurnRight={() => go(index - 1, -1)}
+          onTurnLeft={() => turnBack(1)}
+          onTurnRight={() => turnBack(-1)}
         />
       ) : (
         <TitleScreen onStart={() => setStarted(true)} />
