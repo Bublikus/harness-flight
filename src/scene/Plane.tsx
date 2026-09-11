@@ -24,7 +24,7 @@ export function Plane() {
   const prop = useRef<THREE.Mesh>(null)
   const propMat = useMemo(() => blockMaterials('planeDark', [0.12, 1.6, 0.12]), [])
   useFrame((_, dt) => {
-    if (prop.current) prop.current.rotation.x += dt * 28
+    if (prop.current) prop.current.rotation.z += dt * 28
   })
 
   return (
