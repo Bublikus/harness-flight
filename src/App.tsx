@@ -3,6 +3,7 @@ import { Hud, TitleScreen } from './Hud'
 import { World } from './scene/World'
 import type { TurnDirection } from './scene/Flight'
 import { SLIDES } from './slides'
+import { usePresentationSync } from './presentationSync'
 import './index.css'
 
 export default function App() {
@@ -12,38 +13,48 @@ export default function App() {
   const [flying, setFlying] = useState(false)
   const [approaching, setApproaching] = useState(false)
   const [turnDirection, setTurnDirection] = useState<TurnDirection>(0)
+  const [facing, setFacing] = useState<1 | -1>(1)
+  const upTarget = index + facing
+  const downTarget = index - facing
 
   const go = useCallback((next: number, turn: TurnDirection = 0) => {
     if (next < 0 || next >= SLIDES.length) return
     setFlying(true)
     setApproaching(false)
     setTurnDirection(turn)
+    if ((next - index) * facing < 0)
+      setFacing(facing === 1 ? -1 : 1)
     setBackIndex(index)
     setIndex(next)
-  }, [index])
+  }, [facing, index])
+
+  usePresentationSync(index, (next) => {
+    setStarted(true)
+    if (next !== index) go(next)
+  })
 
   const turnBack = useCallback((turn: TurnDirection) => {
     if (backIndex === null) return
-    setFlying(true)
-    setApproaching(false)
-    setTurnDirection(turn)
-    setBackIndex(index)
-    setIndex(backIndex)
-  }, [backIndex, index])
+    go(backIndex, turn)
+  }, [backIndex, go])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.code === 'Space' || e.code === 'ArrowUp') {
         e.preventDefault()
         if (!started) setStarted(true)
-        else go(index + 1)
+        else go(upTarget)
+      }
+      if (e.code === 'ArrowDown') {
+        e.preventDefault()
+        if (started) go(downTarget)
       }
       if (e.code === 'ArrowLeft') turnBack(1)
       if (e.code === 'ArrowRight') turnBack(-1)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [started, index, go, turnBack])
+  }, [started, upTarget, downTarget, go, turnBack])
 
   return (
     <div className="app">
@@ -63,7 +74,10 @@ export default function App() {
           flying={flying}
           approaching={approaching}
           canTurnBack={backIndex !== null}
-          onForward={() => go(index + 1)}
+          upTarget={upTarget}
+          downTarget={downTarget}
+          onUp={() => go(upTarget)}
+          onDown={() => go(downTarget)}
           onTurnLeft={() => turnBack(1)}
           onTurnRight={() => turnBack(-1)}
         />

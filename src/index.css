@@ -46,13 +46,14 @@ canvas {
 
 .hud-card {
   position: absolute;
-  top: 52px;
+  top: 46%;
   left: 0;
   right: 0;
   display: flex;
   justify-content: center;
   pointer-events: none;
   perspective: 900px;
+  transform: translateY(-50%);
 }
 
 .hud-card .sign {
@@ -67,14 +68,14 @@ canvas {
 @keyframes rise-from-checkpoint {
   from {
     opacity: 0;
-    transform: translateY(calc(100vh - 230px)) scale(0.34);
+    transform: translateY(calc(54vh - 178px)) scale(0.34);
   }
   30% {
     opacity: 1;
   }
   to {
     opacity: 1;
-    transform: none;
+    transform: translateY(-50%);
   }
 }
 

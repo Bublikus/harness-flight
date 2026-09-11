@@ -1,5 +1,13 @@
 import { SLIDES, type Slide } from './slides'
 import { SlideArt } from './SlideArt'
+import './speaker-notes.css'
+
+function openSpeakerNotes() {
+  const url = new URL(window.location.href)
+  url.searchParams.set('view', 'notes')
+  url.hash = ''
+  window.open(url, 'harness-flight-notes', 'noopener,noreferrer')
+}
 
 export function SignCard({ slide: s }: { slide: Slide }) {
   return (
@@ -24,7 +32,10 @@ export function Hud({
   flying,
   approaching,
   canTurnBack,
-  onForward,
+  upTarget,
+  downTarget,
+  onUp,
+  onDown,
   onTurnLeft,
   onTurnRight,
 }: {
@@ -32,7 +43,10 @@ export function Hud({
   flying: boolean
   approaching: boolean
   canTurnBack: boolean
-  onForward: () => void
+  upTarget: number
+  downTarget: number
+  onUp: () => void
+  onDown: () => void
   onTurnLeft: () => void
   onTurnRight: () => void
 }) {
@@ -45,8 +59,13 @@ export function Hud({
           <span className="diamond" />
           HARNESS FLIGHT
         </div>
-        <div className="clock">
-          WAYPOINT {index + 1}/{SLIDES.length}
+        <div className="presenter-tools">
+          <button type="button" className="notes-opener" onClick={openSpeakerNotes}>
+            Speaker notes
+          </button>
+          <div className="clock">
+            WAYPOINT {index + 1}/{SLIDES.length}
+          </div>
         </div>
       </header>
 
@@ -61,9 +80,9 @@ export function Hud({
           <button
             type="button"
             className="pad-up primary"
-            onClick={onForward}
-            disabled={index === SLIDES.length - 1}
-            aria-label="Fly to next slide"
+            onClick={onUp}
+            disabled={upTarget < 0 || upTarget >= SLIDES.length}
+            aria-label={`Fly to ${upTarget > index ? 'next' : 'previous'} slide`}
           >
             ↑
           </button>
@@ -96,9 +115,9 @@ export function Hud({
           <button
             type="button"
             className="pad-down"
-            disabled
-            aria-label="Reserved flight control"
-            title="Reserved"
+            onClick={onDown}
+            disabled={downTarget < 0 || downTarget >= SLIDES.length}
+            aria-label={`Fly to ${downTarget > index ? 'next' : 'previous'} slide`}
           >
             ↓
           </button>
@@ -131,7 +150,7 @@ export function TitleScreen({ onStart }: { onStart: () => void }) {
       <button type="button" className="primary big" onClick={onStart}>
         Take off
       </button>
-      <p className="hint">↑ forward · ←/→ choose U-turn · ↓ reserved</p>
+      <p className="hint">↑/↓ paginate · ←/→ U-turn and reverse</p>
     </div>
   )
 }
