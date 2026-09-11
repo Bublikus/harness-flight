@@ -20,6 +20,33 @@ function Voxel({
   )
 }
 
+function Snappy() {
+  return (
+    <group position={[0, 0.64, 0.74]}>
+      <Voxel p={[0, 0.22, 0]} s={[0.54, 0.4, 0.46]} kind="snappy" />
+      <Voxel p={[0, 0.4, 0]} s={[0.42, 0.28, 0.38]} kind="snappy" />
+      <Voxel p={[0, 0.05, 0]} s={[0.44, 0.24, 0.4]} kind="snappy" />
+      <Voxel p={[0, 0.2, 0.2]} s={[0.32, 0.3, 0.1]} kind="snappyBelly" />
+      <Voxel p={[-0.1, 0.4, 0.2]} s={[0.07, 0.07, 0.05]} kind="snappyFace" />
+      <Voxel p={[0.1, 0.4, 0.2]} s={[0.07, 0.07, 0.05]} kind="snappyFace" />
+      <Voxel p={[-0.06, 0.32, 0.2]} s={[0.05, 0.03, 0.04]} kind="snappyFace" />
+      <Voxel p={[0, 0.31, 0.2]} s={[0.06, 0.03, 0.04]} kind="snappyFace" />
+      <Voxel p={[0.06, 0.32, 0.2]} s={[0.05, 0.03, 0.04]} kind="snappyFace" />
+      <Voxel p={[-0.08, 0.58, 0]} s={[0.07, 0.1, 0.07]} kind="snappy" />
+      <Voxel p={[0, 0.62, 0]} s={[0.08, 0.12, 0.08]} kind="snappy" />
+      <Voxel p={[0.08, 0.58, 0]} s={[0.07, 0.1, 0.07]} kind="snappy" />
+      <Voxel p={[-0.3, 0.38, 0]} s={[0.1, 0.12, 0.1]} kind="snappy" />
+      <Voxel p={[-0.32, 0.38, 0.04]} s={[0.05, 0.07, 0.05]} kind="snappyEar" />
+      <Voxel p={[0.3, 0.38, 0]} s={[0.1, 0.12, 0.1]} kind="snappy" />
+      <Voxel p={[0.32, 0.38, 0.04]} s={[0.05, 0.07, 0.05]} kind="snappyEar" />
+      <Voxel p={[-0.3, 0.06, 0.02]} s={[0.07, 0.26, 0.07]} kind="snappy" />
+      <Voxel p={[0.3, 0.06, 0.02]} s={[0.07, 0.26, 0.07]} kind="snappy" />
+      <Voxel p={[-0.1, -0.12, 0.02]} s={[0.1, 0.12, 0.12]} kind="snappy" />
+      <Voxel p={[0.1, -0.12, 0.02]} s={[0.1, 0.12, 0.12]} kind="snappy" />
+    </group>
+  )
+}
+
 export function Plane() {
   const prop = useRef<THREE.Mesh>(null)
   const propMat = useMemo(() => blockMaterials('planeDark', [0.12, 1.6, 0.12]), [])
@@ -42,13 +69,7 @@ export function Plane() {
         <boxGeometry args={[0.12, 1.6, 0.12]} />
       </mesh>
       <Voxel p={[0, 0.1, 2.55]} s={[0.22, 0.22, 0.22]} kind="gold" />
-      <group position={[0, 0.85, 0.35]}>
-        <Voxel p={[0, 0.45, 0]} s={[0.42, 0.42, 0.42]} kind="skin" />
-        <Voxel p={[0, 0.08, 0]} s={[0.38, 0.4, 0.28]} kind="shirt" />
-        <Voxel p={[-0.12, -0.28, 0]} s={[0.16, 0.32, 0.16]} kind="pants" />
-        <Voxel p={[0.12, -0.28, 0]} s={[0.16, 0.32, 0.16]} kind="pants" />
-        <Voxel p={[0, 0.58, 0.02]} s={[0.46, 0.12, 0.46]} kind="hat" />
-      </group>
+      <Snappy />
     </group>
   )
 }
