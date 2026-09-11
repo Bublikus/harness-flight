@@ -2,6 +2,7 @@ import { Canvas } from '@react-three/fiber'
 import { Sky } from '@react-three/drei'
 import { Terrain } from './Terrain'
 import { Beacons } from './Beacons'
+import { Birds } from './Birds'
 import { Flight, type TurnDirection } from './Flight'
 import { WorldSlide } from './WorldSlide'
 
@@ -42,6 +43,7 @@ export function World({
         mieDirectionalG={0.7}
       />
       <Terrain />
+      <Birds />
       <Beacons current={index} />
       <WorldSlide
         index={index}

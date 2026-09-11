@@ -10,11 +10,39 @@ function n2(x: number, z: number) {
   return Math.abs(Math.sin(x * 12.9898 + z * 78.233) * 43758.5453) % 1
 }
 
-function height(x: number, z: number) {
+export function terrainHeight(x: number, z: number) {
   const ridge = Math.max(0, Math.abs(x) - 16) * 0.55
   const hills = Math.sin(z * 0.07) * 1.4 + Math.sin(x * 0.2 + z * 0.05) * 1.1
   const mtn = ridge > 0 ? ridge + n2(x, z) * 3 : 0
   return Math.max(0, Math.round(hills + mtn))
+}
+
+/** Canopy tops matching tree placement in `build` — for ambient bird perches. */
+export function treePerches(): { x: number; y: number; z: number }[] {
+  const out: { x: number; y: number; z: number }[] = []
+  for (let z = -20; z < LEN; z++) {
+    for (let x = -W; x <= W; x++) {
+      if (isRiver(x, z)) continue
+      const bank = Math.abs(x - riverX(z))
+      if (bank < 2.7 && bank >= 1.6 && Math.abs(x) < 14) continue
+      const h = terrainHeight(x, z)
+      const top = h >= 9 ? 'snow' : h >= 6 ? 'stone' : 'grass'
+      if (top === 'grass' && h <= 3 && Math.abs(x) > 3) {
+        const t = n2(x * 3, z * 3)
+        if (t > 0.984) {
+          const th = 3 + Math.floor(n2(z, x) * 2)
+          out.push({ x, y: h + th + 2.35, z })
+        } else if (t > 0.972) {
+          const th = 4 + Math.floor(n2(x, z) * 2)
+          out.push({ x, y: h + th + 2.35, z })
+        }
+      }
+      if (top === 'stone' && h >= 6 && n2(x, z) > 0.97) {
+        out.push({ x, y: h + 5.35, z })
+      }
+    }
+  }
+  return out
 }
 
 function riverX(z: number) {
@@ -123,7 +151,7 @@ function build(): Bucket[] {
         continue
       }
 
-      const h = height(x, z)
+      const h = terrainHeight(x, z)
       const top = h >= 9 ? 'snow' : h >= 6 ? 'stone' : 'grass'
       if (top === 'snow') push(B.snow, x, h, z)
       else if (top === 'stone') {

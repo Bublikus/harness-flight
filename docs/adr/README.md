@@ -20,6 +20,8 @@ Index of lasting presentation choices. Procedure: `adr` skill.
 | [0014](0014-world-space-slide-surface.md) | World-space slide surface | Accepted |
 | [0015](0015-departing-slides-spring-down.md) | Departing world slides spring down | Accepted |
 | [0016](0016-slide-assist-overlay.md) | Draggable slide-assist overlay | Accepted |
+| [0017](0017-boids-flocks-world-ambience.md) | Boids flocks as world ambience | Superseded by ADR-0018 |
+| [0018](0018-distributed-bird-agents.md) | Distributed bird agents with local flocks and perches | Accepted |
 
 Restore a talk version with `git log --oneline` then `git checkout <commit>`:
 
