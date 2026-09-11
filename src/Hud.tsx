@@ -22,6 +22,7 @@ export function SignCard({ slide: s }: { slide: Slide }) {
 export function Hud({
   index,
   flying,
+  approaching,
   canTurnBack,
   onForward,
   onTurnLeft,
@@ -29,6 +30,7 @@ export function Hud({
 }: {
   index: number
   flying: boolean
+  approaching: boolean
   canTurnBack: boolean
   onForward: () => void
   onTurnLeft: () => void
@@ -48,8 +50,8 @@ export function Hud({
         </div>
       </header>
 
-      {!flying && (
-        <div className="hud-card">
+      {(!flying || approaching) && (
+        <div className={`hud-card ${flying ? 'rising' : ''}`}>
           <SignCard slide={s} />
         </div>
       )}

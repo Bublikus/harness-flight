@@ -10,11 +10,13 @@ export default function App() {
   const [index, setIndex] = useState(0)
   const [backIndex, setBackIndex] = useState<number | null>(null)
   const [flying, setFlying] = useState(false)
+  const [approaching, setApproaching] = useState(false)
   const [turnDirection, setTurnDirection] = useState<TurnDirection>(0)
 
   const go = useCallback((next: number, turn: TurnDirection = 0) => {
     if (next < 0 || next >= SLIDES.length) return
     setFlying(true)
+    setApproaching(false)
     setTurnDirection(turn)
     setBackIndex(index)
     setIndex(next)
@@ -23,6 +25,7 @@ export default function App() {
   const turnBack = useCallback((turn: TurnDirection) => {
     if (backIndex === null) return
     setFlying(true)
+    setApproaching(false)
     setTurnDirection(turn)
     setBackIndex(index)
     setIndex(backIndex)
@@ -48,12 +51,17 @@ export default function App() {
         index={index}
         flying={flying}
         turnDirection={turnDirection}
-        onArrived={() => setFlying(false)}
+        onApproach={() => setApproaching(true)}
+        onArrived={() => {
+          setFlying(false)
+          setApproaching(false)
+        }}
       />
       {started ? (
         <Hud
           index={index}
           flying={flying}
+          approaching={approaching}
           canTurnBack={backIndex !== null}
           onForward={() => go(index + 1)}
           onTurnLeft={() => turnBack(1)}

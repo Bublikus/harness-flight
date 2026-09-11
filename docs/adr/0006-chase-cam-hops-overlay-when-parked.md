@@ -1,6 +1,6 @@
 # ADR-0006: Chase-cam hops; talk copy only when parked
 
-- Status: Accepted
+- Status: Superseded by ADR-0011
 - Date: 2026-09-11
 - Deciders: this session
 

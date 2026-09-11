@@ -28,14 +28,17 @@ export function Flight({
   index,
   flying,
   turnDirection,
+  onApproach,
   onArrived,
 }: {
   index: number
   flying: boolean
   turnDirection: TurnDirection
+  onApproach: () => void
   onArrived: () => void
 }) {
   const group = useRef<THREE.Group>(null)
+  const approaching = useRef(false)
   const arrived = useRef(false)
   const lastIndex = useRef(index)
   const lastTurnDirection = useRef(turnDirection)
@@ -56,6 +59,7 @@ export function Flight({
     ) {
       lastIndex.current = index
       lastTurnDirection.current = turnDirection
+      approaching.current = false
       arrived.current = false
     }
 
@@ -100,6 +104,10 @@ export function Flight({
       g.rotation.z += (bank - g.rotation.z) * (1 - Math.exp(-d * 6))
       g.rotation.x += (pitch - g.rotation.x) * (1 - Math.exp(-d * 5))
     } else if (flying) {
+      if (!approaching.current) {
+        approaching.current = true
+        onApproach()
+      }
       yawRate.current += (0 - yawRate.current) * (1 - Math.exp(-d * 8))
       speed.current += (0 - speed.current) * (1 - Math.exp(-d * 8))
       g.position.lerp(dest, 1 - Math.exp(-d * 7))

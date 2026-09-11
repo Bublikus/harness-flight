@@ -8,11 +8,13 @@ export function World({
   index,
   flying,
   turnDirection,
+  onApproach,
   onArrived,
 }: {
   index: number
   flying: boolean
   turnDirection: TurnDirection
+  onApproach: () => void
   onArrived: () => void
 }) {
   return (
@@ -38,6 +40,7 @@ export function World({
         index={index}
         flying={flying}
         turnDirection={turnDirection}
+        onApproach={onApproach}
         onArrived={onArrived}
       />
     </Canvas>

@@ -9,11 +9,12 @@ Index of lasting presentation choices. Procedure: `adr` skill.
 | [0003](0003-github-pages-from-main.md) | Deploy the live talk from `main` to GitHub Pages | Accepted |
 | [0004](0004-overlay-hud-dim-in-flight.md) | Overlay HUD; dim the sign while flying | Superseded by ADR-0005 |
 | [0005](0005-in-world-signs-on-posts.md) | In-world signs that dock on waypoint posts | Superseded by ADR-0006 |
-| [0006](0006-chase-cam-hops-overlay-when-parked.md) | Chase-cam hops; talk copy only when parked | Accepted |
+| [0006](0006-chase-cam-hops-overlay-when-parked.md) | Chase-cam hops; talk copy only when parked | Superseded by ADR-0011 |
 | [0007](0007-interruptible-uturn-hops.md) | Interruptible hops with a banked U-turn | Accepted |
 | [0008](0008-directional-flight-pad.md) | Directional flight pad | Superseded by ADR-0010 |
 | [0009](0009-user-paced-presentation.md) | User-paced presentation | Accepted |
 | [0010](0010-reversible-flight-axis.md) | Reversible flight axis | Accepted |
+| [0011](0011-slide-rises-on-final-approach.md) | Slide rises on final approach | Accepted |
 
 Restore a talk version with `git log --oneline` then `git checkout <commit>`:
 
