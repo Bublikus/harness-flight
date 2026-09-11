@@ -171,6 +171,7 @@ function WorldSlideCard({
     const card = group.current
     if (!card) return
     const target = raised ? 1 : 0
+    if (active) slidePose.index = index
     if (
       !target &&
       Math.abs(rise.current) < 0.002 &&

@@ -7,7 +7,7 @@ import { terrainHeight, treePerches } from './Terrain'
 import { planePose, slidePose } from './worldPoses'
 
 /** Scattered agents · small local flocks · optional tree perches · rare slide flybys. */
-const COUNT = 34
+const COUNT = 17
 const X_MAX = 17
 const Z_MIN = -6
 const Z_MAX = SLIDES.length * WAYPOINT_SPACING + 24
@@ -28,9 +28,12 @@ const PERCH_CHANCE = 0.018
 const LAND_R = 0.12
 const ALT_LIFT = 7
 const SEP_MIN_D = 0.4
+/** Retry delay only — session gate (one initiated flyby per slide) is the limiter. */
 const FLYBY_COOLDOWN = 5
 const FLYBY_NEAR = 52
 const FLYBY_SPEED = 9.2
+const TRAP_DWELL = 1.5
+const OSC_ALONG = 1.2
 /** Biplane AABB ≈ wings 5.6 × fuselage ~5.1 × height ~1.5 → enclosing r≈3.9; keep agents clear. */
 const PLANE_R = 5.4
 const PLANE_HARD = 4.6
@@ -68,6 +71,12 @@ type Bird = {
   c3: THREE.Vector3
   u: number
   arc: number
+  /** Used a corridor pass this slide session — not eligible again until index changes. */
+  flybySpent: boolean
+  gapTime: number
+  lastAlong: number
+  /** Locked lateral eject sign; 0 = not ejecting. */
+  ejectSide: number
 }
 
 function rnd(a: number, b: number) {
@@ -125,6 +134,10 @@ function seedBirds(perches: { x: number; y: number; z: number }[]): Bird[] {
       c3: new THREE.Vector3(),
       u: 0,
       arc: 1,
+      flybySpent: false,
+      gapTime: 0,
+      lastAlong: 0,
+      ejectSide: 0,
     })
   }
   // Nudge a few onto nearby perches so the world isn't empty of perched birds at t=0.
@@ -466,6 +479,75 @@ function corridorMid(
   return out
 }
 
+/** Audience-side slab between plane and slide, within board XY. */
+function inCorridor(p: THREE.Vector3, scratch: THREE.Vector3, local: THREE.Vector3) {
+  if (!planePose.valid || !slideLive()) return false
+  toSlideLocal(p, local, scratch)
+  if (Math.abs(local.x) > slidePose.half.x + 2.4 || Math.abs(local.y) > slidePose.half.y + 2.4)
+    return false
+  scratch.copy(planePose.pos).sub(slidePose.pos)
+  const aud = slidePose.normal.dot(scratch) > 0 ? 1 : -1
+  if (local.z * aud < slidePose.half.z - 0.2) return false
+  scratch.copy(slidePose.pos).sub(planePose.pos)
+  const spanSq = scratch.lengthSq()
+  if (spanSq < 1e-4) return true
+  const u =
+    ((p.x - planePose.pos.x) * scratch.x +
+      (p.y - planePose.pos.y) * scratch.y +
+      (p.z - planePose.pos.z) * scratch.z) /
+    spanSq
+  return u > -0.1 && u < 1.08
+}
+
+function chordAxis(out: THREE.Vector3) {
+  out.copy(slidePose.pos).sub(planePose.pos)
+  if (out.lengthSq() < 1e-6) out.copy(slidePose.normal)
+  else out.normalize()
+  return out
+}
+
+function pickExitSide(p: THREE.Vector3, v: THREE.Vector3, scratch: THREE.Vector3) {
+  scratch.copy(p).sub(slidePose.pos)
+  const along = Math.sign(scratch.dot(slidePose.right))
+  if (along) return along
+  const byV = Math.sign(v.dot(slidePose.right))
+  return byV || 1
+}
+
+/** Lateral + up + away from the plane/slide mid; no chord (ping-pong) component. */
+function outboundDir(p: THREE.Vector3, side: number, out: THREE.Vector3, scratch: THREE.Vector3) {
+  const mx = (planePose.pos.x + slidePose.pos.x) * 0.5
+  const my = (planePose.pos.y + slidePose.pos.y) * 0.5
+  const mz = (planePose.pos.z + slidePose.pos.z) * 0.5
+  out.copy(slidePose.right).multiplyScalar(side)
+  out.addScaledVector(slidePose.up, 0.5)
+  scratch.set(p.x - mx, p.y - my, p.z - mz)
+  if (scratch.lengthSq() > 1e-6) out.addScaledVector(scratch.normalize(), 0.65)
+  if (out.lengthSq() < 1e-6) out.copy(slidePose.right).multiplyScalar(side)
+  else out.normalize()
+  scratch.copy(slidePose.pos).sub(planePose.pos)
+  if (scratch.lengthSq() > 1e-6) {
+    scratch.normalize()
+    out.addScaledVector(scratch, -out.dot(scratch))
+  }
+  if (out.lengthSq() < 1e-6) out.copy(slidePose.right).multiplyScalar(side)
+  else out.normalize()
+  return out
+}
+
+function handoffOutbound(b: Bird, time: number, scratch: THREE.Vector3, scratch2: THREE.Vector3) {
+  const side = b.ejectSide || pickExitSide(b.p, b.v, scratch)
+  b.ejectSide = side
+  outboundDir(b.p, side, scratch, scratch2)
+  b.v.copy(scratch).multiplyScalar(Math.max(b.maxSp, FLYBY_SPEED * 0.9))
+  b.goal.copy(b.p).addScaledVector(scratch, rnd(28, 44))
+  const floor = terrainHeight(b.goal.x, b.goal.z) + CLEARANCE
+  b.goal.y = THREE.MathUtils.clamp(b.goal.y, floor + 2, floor + ALT_PAD - 1)
+  b.flybySpent = true
+  b.retargetAt = time + rnd(6, 12)
+  b.gapTime = 0
+}
+
 export function Birds() {
   const perches = useMemo(treePerches, [])
   const birds = useMemo(() => seedBirds(perches), [perches])
@@ -490,6 +572,8 @@ export function Birds() {
   const avoid = useMemo(() => new THREE.Vector3(), [])
   const occupied = useMemo(() => new Set<number>(), [])
   const nextFlybyAt = useRef(4)
+  const sessionIndex = useRef(-1)
+  const flybyAllowed = useRef(true)
   const bodyMat = useMemo(() => blockMaterials('hat') as THREE.Material, [])
   const wingMat = useMemo(() => blockMaterials('planeDark') as THREE.Material, [])
   const beakMat = useMemo(() => blockMaterials('gold') as THREE.Material, [])
@@ -516,7 +600,19 @@ export function Birds() {
       }
     }
 
-    // ~1 flyby / 5s through the plane↔slide corridor when a board is up.
+    // One initiated corridor flyby per slide session (index unchanged).
+    if (slidePose.index !== sessionIndex.current) {
+      sessionIndex.current = slidePose.index
+      flybyAllowed.current = true
+      nextFlybyAt.current = time + 2.2
+      for (const b of birds) {
+        b.flybySpent = false
+        b.ejectSide = 0
+        b.gapTime = 0
+        b.lastAlong = 0
+      }
+    }
+
     let flybyBusy = false
     for (const b of birds) {
       if (b.mode === 'flyby') {
@@ -525,6 +621,7 @@ export function Birds() {
       }
     }
     if (
+      flybyAllowed.current &&
       !flybyBusy &&
       time >= nextFlybyAt.current &&
       planePose.valid &&
@@ -537,7 +634,8 @@ export function Birds() {
       let bestD = FLYBY_NEAR
       for (let i = 0; i < birds.length; i++) {
         const b = birds[i]
-        if (b.mode !== 'fly') continue
+        if (b.mode !== 'fly' || b.flybySpent) continue
+        if (inCorridor(b.p, tmp, local)) continue
         // Front-of-board only — a back-side start would cross the canvas to reach mid.
         const along = slidePose.normal.dot(tmp.copy(b.p).sub(slidePose.pos))
         if (along * face < slidePose.half.z + 0.4) continue
@@ -565,8 +663,8 @@ export function Birds() {
         // Exit: skim past mid along board right, still clear of the surface.
         b.c3
           .copy(mid)
-          .addScaledVector(slidePose.right, side * rnd(11, 17))
-          .addScaledVector(slidePose.up, rnd(0.8, 2.4))
+          .addScaledVector(slidePose.right, side * rnd(14, 22))
+          .addScaledVector(slidePose.up, rnd(1.2, 3.0))
           .addScaledVector(slidePose.normal, face * (front * 0.35))
         pinToFace(b.c1, face, CORRIDOR_SLIDE * 0.25, tmp, local)
         pinToFace(b.c2, face, CORRIDOR_SLIDE * 0.4, tmp, local)
@@ -576,6 +674,7 @@ export function Birds() {
         b.u = 0
         b.arc = approxArc(b.c0, b.c1, b.c2, b.c3, tmp, tmp2)
         b.mode = 'flyby'
+        flybyAllowed.current = false
         nextFlybyAt.current = time + FLYBY_COOLDOWN + rnd(-0.6, 1.2)
       } else {
         nextFlybyAt.current = time + 1.2
@@ -599,12 +698,8 @@ export function Birds() {
         softFloor(b, t)
         if (b.u >= 1) {
           b.mode = 'fly'
-          // Hand back: keep exit tangent as cruise speed, new goal ahead.
-          limit(b.v, b.minSp, b.maxSp)
-          b.goal.copy(b.p).addScaledVector(tmp.copy(b.v).normalize(), rnd(18, 32))
-          const floor = terrainHeight(b.goal.x, b.goal.z) + CLEARANCE
-          b.goal.y = THREE.MathUtils.clamp(b.goal.y, floor + 1, floor + ALT_PAD - 1)
-          b.retargetAt = time + rnd(4, 12)
+          // Hand back: lateral + away from the corridor mid — not a goal that recrosses.
+          handoffOutbound(b, time, tmp, tmp2)
         }
       } else if (b.mode === 'perch' && b.perch) {
         // Soft settle — remaining gap is at most LAND_R after approach.
@@ -644,10 +739,19 @@ export function Birds() {
         }
       } else {
         if (time > b.retargetAt || b.p.distanceToSquared(b.goal) < 9) {
-          skyPoint(b.purpose, b.goal)
+          if (b.flybySpent && inCorridor(b.p, tmp, local)) {
+            const side = b.ejectSide || pickExitSide(b.p, b.v, tmp)
+            outboundDir(b.p, side, tmp, tmp2)
+            b.goal.copy(b.p).addScaledVector(tmp, rnd(28, 40))
+            const floor = terrainHeight(b.goal.x, b.goal.z) + CLEARANCE
+            b.goal.y = THREE.MathUtils.clamp(b.goal.y, floor + 2, floor + ALT_PAD - 1)
+          } else {
+            skyPoint(b.purpose, b.goal)
+          }
           b.retargetAt = time + rnd(4, 14)
           if (
             b.purpose !== 'commute' &&
+            !b.flybySpent &&
             perches.length &&
             Math.random() < PERCH_CHANCE * (b.purpose === 'forage' ? 2.4 : 1)
           ) {
@@ -721,6 +825,37 @@ export function Birds() {
 
         b.v.addScaledVector(steer, t)
         limit(b.v, b.minSp, b.maxSp)
+
+        // Trap eject: dwell or chord-axis reversal in the plane–slide gap.
+        if (inCorridor(b.p, tmp, local)) {
+          chordAxis(axis)
+          const along = b.v.dot(axis)
+          const osc =
+            b.lastAlong * along < 0 &&
+            Math.abs(b.lastAlong) > OSC_ALONG &&
+            Math.abs(along) > OSC_ALONG
+          b.lastAlong = along
+          b.gapTime += t
+          if (!b.ejectSide && (osc || b.gapTime > TRAP_DWELL))
+            b.ejectSide = pickExitSide(b.p, b.v, tmp)
+          if (b.ejectSide) {
+            outboundDir(b.p, b.ejectSide, avoid, tmp2)
+            b.goal.copy(b.p).addScaledVector(avoid, 34)
+            avoid.multiplyScalar(Math.max(b.maxSp, FLYBY_SPEED * 0.85))
+            b.v.lerp(avoid, 0.6)
+            b.v.addScaledVector(axis, -b.v.dot(axis))
+            limit(b.v, b.minSp, Math.max(b.maxSp, FLYBY_SPEED * 0.85))
+            const loft = terrainHeight(b.goal.x, b.goal.z) + CLEARANCE
+            b.goal.y = THREE.MathUtils.clamp(b.goal.y, loft + 2, loft + ALT_PAD - 1)
+            b.retargetAt = Math.max(b.retargetAt, time + 5)
+            b.flybySpent = true
+          }
+        } else {
+          b.gapTime = 0
+          b.lastAlong = 0
+          b.ejectSide = 0
+        }
+
         prev.copy(b.p)
         b.p.addScaledVector(b.v, t)
         slideSweep(prev, b.p, b.v, tmp, local, prevL)

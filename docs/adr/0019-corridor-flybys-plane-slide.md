@@ -1,6 +1,6 @@
 # ADR-0019: Corridor flybys between plane and slide
 
-- Status: Accepted
+- Status: Superseded by ADR-0021
 - Date: 2026-09-11
 - Deciders: this session
 

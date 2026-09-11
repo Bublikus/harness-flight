@@ -8,6 +8,8 @@ export const planePose = {
 
 export const slidePose = {
   pos: new THREE.Vector3(),
+  /** Active waypoint index; −1 until a board publishes. Session key for flybys. */
+  index: -1,
   /** Board local +Z in world (audience / plane-facing). */
   normal: new THREE.Vector3(0, 0, 1),
   /** Board local +X in world. */
