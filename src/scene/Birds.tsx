@@ -413,6 +413,35 @@ function pinToFace(
   p.addScaledVector(normal, need - local.z)
 }
 
+/** Shorten the start handle toward c0 so B'(0) keeps the current heading. */
+function shortenToFace(
+  c0: THREE.Vector3,
+  c1: THREE.Vector3,
+  face: number,
+  clear: number,
+  scratch: THREE.Vector3,
+  local: THREE.Vector3,
+) {
+  if (!slideLive()) return
+  const { half } = slidePose
+  for (let i = 0; i < 8; i++) {
+    toSlideLocal(c1, local, scratch)
+    if (Math.abs(local.x) > half.x + SLIDE_PAD || Math.abs(local.y) > half.y + SLIDE_PAD) return
+    if (local.z * face >= half.z + clear) return
+    c1.lerp(c0, 0.4)
+  }
+}
+
+/** Full plane clearance for path nodes — softResolve only nudges 55% and fights the curve. */
+function clearPlane(p: THREE.Vector3, scratch: THREE.Vector3) {
+  if (!planePose.valid) return
+  scratch.copy(p).sub(planePose.pos)
+  const d = scratch.length()
+  const need = PLANE_HARD + 0.6
+  if (d < need && d > 1e-5) p.addScaledVector(scratch, (need - d) / d)
+  else if (d < 1e-5) p.y += need
+}
+
 /** If p→goal would pierce the board, cancel the through component and steer around. */
 function slideDetour(
   p: THREE.Vector3,
@@ -468,7 +497,7 @@ function corridorMid(
     out.lerp(scratch, 0.42)
   } else {
     // Tight gap: stay on the board face and step sideways clear of the plane.
-    out.addScaledVector(slidePose.right, (Math.random() < 0.5 ? 1 : -1) * rnd(2.5, 4.5))
+    out.addScaledVector(slidePose.right, (Math.random() < 0.5 ? 1 : -1) * rnd(3.8, 5.8))
   }
   out.addScaledVector(slidePose.up, rnd(0.3, 1.5))
   out.addScaledVector(slidePose.right, rnd(-1.6, 1.6))
@@ -539,7 +568,7 @@ function handoffOutbound(b: Bird, time: number, scratch: THREE.Vector3, scratch2
   const side = b.ejectSide || pickExitSide(b.p, b.v, scratch)
   b.ejectSide = side
   outboundDir(b.p, side, scratch, scratch2)
-  b.v.copy(scratch).multiplyScalar(Math.max(b.maxSp, FLYBY_SPEED * 0.9))
+  // Keep the curve's exit tangent — replacing v here was a heading snap at pin/eject.
   b.goal.copy(b.p).addScaledVector(scratch, rnd(28, 44))
   const floor = terrainHeight(b.goal.x, b.goal.z) + CLEARANCE
   b.goal.y = THREE.MathUtils.clamp(b.goal.y, floor + 2, floor + ALT_PAD - 1)
@@ -647,16 +676,18 @@ export function Birds() {
       }
       if (best >= 0) {
         const b = birds[best]
-        const chord = b.p.distanceTo(mid)
-        const heading = tmp.copy(b.v)
-        if (heading.lengthSq() < 1e-4) heading.set(1, 0, 0)
-        else heading.normalize()
+        const sp = Math.max(b.v.length(), b.minSp)
+        tmp.copy(b.v)
+        if (tmp.lengthSq() < 1e-4) tmp.set(1, 0, 0)
+        else tmp.normalize()
         // Exit laterally along the board, staying on the audience side (not through canvas).
         const side = Math.random() < 0.5 ? 1 : -1
         const front = slidePose.half.z + CORRIDOR_SLIDE
+        // Hermite start: c0 = pose, c1 along current v so B'(0) matches heading.
+        const handle = Math.min(12, Math.max(2.4, sp * 0.38))
 
         b.c0.copy(b.p)
-        b.c1.copy(b.p).addScaledVector(heading, Math.min(14, chord * 0.38))
+        b.c1.copy(b.p).addScaledVector(tmp, handle)
         // Approach mid from the plane side of the corridor.
         b.c2.copy(mid).addScaledVector(slidePose.normal, face * 0.6)
         b.c2.addScaledVector(slidePose.right, rnd(-1.2, 1.2))
@@ -666,7 +697,11 @@ export function Birds() {
           .addScaledVector(slidePose.right, side * rnd(14, 22))
           .addScaledVector(slidePose.up, rnd(1.2, 3.0))
           .addScaledVector(slidePose.normal, face * (front * 0.35))
-        pinToFace(b.c1, face, CORRIDOR_SLIDE * 0.25, tmp, local)
+        shortenToFace(b.c0, b.c1, face, CORRIDOR_SLIDE * 0.25, tmp, local)
+        pinToFace(b.c2, face, CORRIDOR_SLIDE * 0.4, tmp, local)
+        pinToFace(b.c3, face, CORRIDOR_SLIDE * 0.25, tmp, local)
+        clearPlane(b.c2, tmp)
+        clearPlane(b.c3, tmp)
         pinToFace(b.c2, face, CORRIDOR_SLIDE * 0.4, tmp, local)
         pinToFace(b.c3, face, CORRIDOR_SLIDE * 0.25, tmp, local)
         softResolve(b.c2, tmp, local, 1)
@@ -685,21 +720,27 @@ export function Birds() {
       const b = birds[i]
 
       if (b.mode === 'flyby') {
-        const du = (FLYBY_SPEED * t) / b.arc
-        b.u = Math.min(1, b.u + du)
+        // Sample current u first (0 on the stick frame = current pose), then advance.
+        const prevSp = Math.max(b.v.length(), b.minSp)
+        const spd = THREE.MathUtils.damp(prevSp, FLYBY_SPEED, 3.2, t)
         prev.copy(b.p)
+        tmp2.copy(b.v)
         bezier(b.c0, b.c1, b.c2, b.c3, b.u, b.p)
         bezierDeriv(b.c0, b.c1, b.c2, b.c3, b.u, b.v, tmp)
         const tanLen = b.v.length()
-        if (tanLen > 1e-4) b.v.multiplyScalar(FLYBY_SPEED / tanLen)
-        else b.v.copy(tmp2.copy(b.c3).sub(b.c2)).setLength(FLYBY_SPEED)
-        slideSweep(prev, b.p, b.v, tmp, local, prevL)
-        softResolve(b.p, tmp, local, t)
+        if (tanLen > 1e-4) b.v.multiplyScalar(spd / tanLen)
+        else b.v.copy(tmp2).setLength(spd)
+        if (b.u > 0) {
+          slideSweep(prev, b.p, b.v, tmp, local, prevL)
+          softResolve(b.p, tmp, local, t)
+        }
         softFloor(b, t)
         if (b.u >= 1) {
           b.mode = 'fly'
           // Hand back: lateral + away from the corridor mid — not a goal that recrosses.
           handoffOutbound(b, time, tmp, tmp2)
+        } else {
+          b.u = Math.min(1, b.u + (spd * t) / b.arc)
         }
       } else if (b.mode === 'perch' && b.perch) {
         // Soft settle — remaining gap is at most LAND_R after approach.

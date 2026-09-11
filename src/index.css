@@ -231,3 +231,13 @@ button:active:not(:disabled) {
   font-size: 8px;
   opacity: 0.85;
 }
+
+.shortcuts {
+  margin-top: 10px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7px;
+  line-height: 1.85;
+  letter-spacing: 0.02em;
+  color: #d4e6f4;
+  opacity: 0.38;
+}

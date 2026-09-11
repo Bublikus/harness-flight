@@ -16,7 +16,9 @@ const CRUISE = 26
 const YAW_RATE = 3.3
 const SLOWDOWN_RADIUS = 28
 const ARRIVAL_RADIUS = 2
-const DOCK_RADIUS = 0.01
+const DOCK_RADIUS = 0.12
+const DOCK_SPEED = 0.35
+const CAPTURE = 2.4
 const TWO_PI = Math.PI * 2
 
 function wrapPi(a: number) {
@@ -75,50 +77,59 @@ export function Flight({
       err = turnDirection * Math.abs(err)
     const turning = Math.abs(err) > 0.4
 
-    if (flying && dist > ARRIVAL_RADIUS) {
-      arrived.current = false
-      const targetYawRate = THREE.MathUtils.clamp(err * 4, -YAW_RATE, YAW_RATE)
+    if (flying) {
+      if (dist > ARRIVAL_RADIUS) {
+        arrived.current = false
+      } else if (!approaching.current) {
+        approaching.current = true
+        onApproach()
+      }
+
+      const capturing = dist <= ARRIVAL_RADIUS
+      const steer =
+        capturing ? THREE.MathUtils.smoothstep(horiz, 0.05, ARRIVAL_RADIUS) : 1
+      const targetYawRate =
+        THREE.MathUtils.clamp(err * 4, -YAW_RATE, YAW_RATE) * steer
       yawRate.current +=
         (targetYawRate - yawRate.current) * (1 - Math.exp(-d * 8))
-      yaw.current = wrapPi(yaw.current + yawRate.current * d)
+      yaw.current = wrapPi(
+        yaw.current + yawRate.current * d * (capturing ? 1 / 3 : 1),
+      )
 
       const aligned = THREE.MathUtils.clamp(Math.cos(err), 0, 1)
       const turnFactor = turning ? 0.32 + 0.28 * aligned : 0.55 + 0.45 * aligned
-      const approach =
+      const cruise =
         0.18 +
-        THREE.MathUtils.smoothstep(
-          horiz,
-          ARRIVAL_RADIUS,
-          SLOWDOWN_RADIUS,
-        ) *
-          0.82
-      const targetSpeed = CRUISE * turnFactor * approach
+        THREE.MathUtils.smoothstep(horiz, ARRIVAL_RADIUS, SLOWDOWN_RADIUS) * 0.82
+      const approach = 0.18 * THREE.MathUtils.smoothstep(horiz, 0, ARRIVAL_RADIUS)
+      const targetSpeed = CRUISE * turnFactor * (capturing ? approach : cruise)
       speed.current += (targetSpeed - speed.current) * (1 - Math.exp(-d * 3.2))
 
       g.position.x += Math.sin(yaw.current) * speed.current * d
       g.position.z += Math.cos(yaw.current) * speed.current * d
       g.position.y += (dest.y - g.position.y) * (1 - Math.exp(-d * 1.5))
+      // Capture fade is 0 at the 2u boundary so the pull cannot spike velocity.
+      if (capturing && dist > 1e-5) {
+        const fade = THREE.MathUtils.smoothstep(
+          ARRIVAL_RADIUS - dist,
+          0,
+          ARRIVAL_RADIUS,
+        )
+        g.position.lerp(dest, 1 - Math.exp(-d * CAPTURE * fade))
+      }
 
       g.rotation.y = yaw.current
-      const bank = (-yawRate.current / YAW_RATE) * 0.68
-      const pitch = turning ? 0.16 : 0.07
+      const bank = (-yawRate.current / YAW_RATE) * 0.68 * (capturing ? 0.5 : 1)
+      const pitch = (turning ? 0.16 : 0.07) * (capturing ? steer : 1)
       g.rotation.z += (bank - g.rotation.z) * (1 - Math.exp(-d * 6))
       g.rotation.x += (pitch - g.rotation.x) * (1 - Math.exp(-d * 5))
-    } else if (flying) {
-      if (!approaching.current) {
-        approaching.current = true
-        onApproach()
-      }
-      yawRate.current += (0 - yawRate.current) * (1 - Math.exp(-d * 8))
-      speed.current += (0 - speed.current) * (1 - Math.exp(-d * 8))
-      g.position.lerp(dest, 1 - Math.exp(-d * 7))
-      g.rotation.z += (0 - g.rotation.z) * (1 - Math.exp(-d * 6))
-      g.rotation.x += (0 - g.rotation.x) * (1 - Math.exp(-d * 6))
 
-      if (g.position.distanceTo(dest) < DOCK_RADIUS && !arrived.current) {
+      if (
+        g.position.distanceTo(dest) < DOCK_RADIUS &&
+        speed.current < DOCK_SPEED &&
+        !arrived.current
+      ) {
         arrived.current = true
-        speed.current = 0
-        g.position.copy(dest)
         parkedAt.current = state.clock.elapsedTime
         onArrived()
       }
@@ -130,7 +141,10 @@ export function Flight({
         Math.sin(parkedFor * 2.2) *
         0.12 *
         THREE.MathUtils.smoothstep(parkedFor, 0, 0.8)
-      g.position.y = dest.y + bob
+      const settle = 1 - Math.exp(-d * 5)
+      g.position.x += (dest.x - g.position.x) * settle
+      g.position.z += (dest.z - g.position.z) * settle
+      g.position.y += (dest.y + bob - g.position.y) * settle
       g.rotation.y = yaw.current
       g.rotation.z += (0 - g.rotation.z) * (1 - Math.exp(-d * 3))
       g.rotation.x += (0 - g.rotation.x) * (1 - Math.exp(-d * 3))

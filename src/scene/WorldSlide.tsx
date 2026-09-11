@@ -9,6 +9,22 @@ import { slidePose } from './worldPoses'
 
 const WIDTH = 16
 const HEIGHT = 7.5
+/** rise=0 center: frame top (half of HEIGHT+0.5) sits below grass at y≈0. */
+const SUNK_Y = -(HEIGHT + 0.5) / 2 - 1
+/** Board-local swoop (side / behind / toward camera). Spring overshoot past rise=1 is the settle. */
+function flight(rise: number, parkedY: number, yaw: number, side: 1 | -1) {
+  const u = 1 - rise
+  const swell = Math.sin(Math.PI * rise)
+  const lx = 3.2 * side * u
+  const lz = -1.8 * u + 2.4 * swell
+  const c = Math.cos(yaw)
+  const s = Math.sin(yaw)
+  return {
+    x: lx * c + lz * s,
+    y: THREE.MathUtils.lerp(SUNK_Y, parkedY, rise) + 0.5 * swell,
+    z: -lx * s + lz * c,
+  }
+}
 const TEXTURE_WIDTH = 1536
 const TEXTURE_HEIGHT = 720
 const ART_BACKGROUNDS: Record<string, string> = {
@@ -123,6 +139,7 @@ function WorldSlideCard({
   flying,
   approaching,
   facing,
+  hidden,
   active,
   onExited,
 }: {
@@ -131,6 +148,7 @@ function WorldSlideCard({
   flying: boolean
   approaching: boolean
   facing: 1 | -1
+  hidden: boolean
   active: boolean
   onExited: () => void
 }) {
@@ -138,10 +156,11 @@ function WorldSlideCard({
   const rise = useRef(0)
   const velocity = useRef(0)
   const scale = useRef(1)
+  const side = useRef<1 | -1>(Math.random() < 0.5 ? 1 : -1)
   const { gl, viewport } = useThree()
   const slide = SLIDES[index]
   const pose = useMemo(() => routePose(index, facing), [index, facing])
-  const raised = active && started && (!flying || approaching)
+  const raised = active && started && (!flying || approaching) && !hidden
   const frame = useMemo(() => blockMaterials('plank', [WIDTH + 0.5, HEIGHT + 0.5, 0.34]), [])
   const { canvas, texture } = useMemo(() => {
     const canvas = document.createElement('canvas')
@@ -194,7 +213,9 @@ function WorldSlideCard({
       (velocity.current + (target - rise.current) * 68 * d) *
       Math.exp(-9 * d)
     rise.current += velocity.current * d
-    card.position.y = THREE.MathUtils.lerp(3.9, pose.y, rise.current)
+    const f = flight(rise.current, pose.y, pose.rotation, side.current)
+    card.position.set(pose.x + f.x, f.y, pose.z + f.z)
+    card.rotation.set(0, pose.rotation, 0)
 
     const worldWidth = viewport.getCurrentViewport(state.camera, card.position).width
     const targetScale = THREE.MathUtils.clamp(worldWidth * 0.86 / WIDTH, 0.46, 1)
@@ -224,7 +245,7 @@ function WorldSlideCard({
   return (
     <group
       ref={group}
-      position={[pose.x, 3.9, pose.z]}
+      position={[pose.x, SUNK_Y, pose.z]}
       rotation={[0, pose.rotation, 0]}
       visible={false}
     >
@@ -250,12 +271,14 @@ export function WorldSlide({
   flying,
   approaching,
   facing,
+  hidden,
 }: {
   index: number
   started: boolean
   flying: boolean
   approaching: boolean
   facing: 1 | -1
+  hidden: boolean
 }) {
   const [state, setState] = useState(() => ({
     current: index,
@@ -287,6 +310,7 @@ export function WorldSlide({
       started={started}
       flying={flying}
       approaching={approaching}
+      hidden={hidden}
       active={card.index === index}
       onExited={() => remove(card.index)}
     />

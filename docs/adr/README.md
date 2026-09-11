@@ -25,6 +25,7 @@ Index of lasting presentation choices. Procedure: `adr` skill.
 | [0019](0019-corridor-flybys-plane-slide.md) | Corridor flybys between plane and slide | Superseded by ADR-0021 |
 | [0020](0020-directional-shadow-maps.md) | Directional shadow maps for bird silhouettes | Accepted |
 | [0021](0021-one-flyby-per-slide-session.md) | One corridor flyby per slide session | Accepted |
+| [0022](0022-presenter-h-toggle-slide.md) | Presenter H-toggle for the current slide | Accepted |
 
 Restore a talk version with `git log --oneline` then `git checkout <commit>`:
 

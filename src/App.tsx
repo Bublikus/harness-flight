@@ -22,8 +22,13 @@ export default function App() {
   const [approaching, setApproaching] = useState(false)
   const [turnDirection, setTurnDirection] = useState<TurnDirection>(0)
   const [facing, setFacing] = useState<1 | -1>(1)
+  const [slideHidden, setSlideHidden] = useState(false)
   const upTarget = index + facing
   const downTarget = index - facing
+
+  useEffect(() => {
+    setSlideHidden(false)
+  }, [index])
 
   const go = useCallback((next: number, turn: TurnDirection = 0) => {
     if (next < 0 || next >= SLIDES.length) return
@@ -48,6 +53,9 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const typing =
+        e.target instanceof HTMLElement &&
+        !!e.target.closest('input, textarea, select, [contenteditable="true"]')
       if (e.code === 'Space' || e.code === 'ArrowUp') {
         e.preventDefault()
         if (!started) setStarted(true)
@@ -63,6 +71,11 @@ export default function App() {
         e.preventDefault()
         openSpeakerNotes()
       }
+      if (e.code === 'KeyH') {
+        if (typing || !started) return
+        e.preventDefault()
+        setSlideHidden((hidden) => !hidden)
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -76,6 +89,7 @@ export default function App() {
         flying={flying}
         approaching={approaching}
         facing={facing}
+        slideHidden={slideHidden}
         turnDirection={turnDirection}
         onApproach={() => setApproaching(true)}
         onArrived={() => {
