@@ -112,40 +112,40 @@ const paints: Record<string, (set: (x: number, y: number, hex: string) => void) 
       }
     }
   },
-  dirt: (set) => noise(set, ['#4a2410', '#6b3d20', '#8a5a32', '#c48a50'], 3),
+  dirt: (set) => noise(set, ['#5a3018', '#6b3d20', '#8a5a32', '#c48a50'], 3),
   stone: (set) => cobble(set, ['#7b7b7b', '#8a8a8a', '#6e6e6e', '#9a9a9a'], '#5c5c5c', 5),
   gravel: (set) => noise(set, ['#4a4a44', '#8b8680', '#c4bfb6', '#6e5a40'], 6),
   water: (set) => {
     for (let y = 0; y < S; y++) {
       for (let x = 0; x < S; x++) {
         const wave = (x + y + Math.floor(n(x, y, 7) * 2)) % 5
-        set(x, y, wave < 2 ? '#7ec8f0' : wave === 2 ? '#3a6ea5' : '#1a3a68')
+        set(x, y, wave < 2 ? '#7ec8f0' : wave === 2 ? '#3a6ea5' : '#244878')
       }
     }
   },
   sand: (set) => noise(set, ['#a89460', '#c2b280', '#efe0b0', '#8a7038'], 8),
-  oakBark: (set) => bark(set, ['#6b4a22', '#7a5528', '#5a3c1c', '#8a6230'], '#3a2414', 9),
-  oakEnd: (set) => rings(set, '#c4a06a', '#8a6230', 10),
+  oakBark: (set) => bark(set, ['#7a5630', '#8a6538', '#6a4a28', '#9a7340'], '#5a3c22', 9),
+  oakEnd: (set) => rings(set, '#c4a06a', '#9a7340', 10),
   birchBark: (set) => {
     noise(set, ['#d7d2c4', '#efeae0', '#c8c2b4'], 11)
     for (let y = 0; y < S; y++) {
       for (let x = 0; x < S; x++) {
-        if (n(x, y, 12) > 0.88 || (x % 7 === 2 && n(y, x, 13) > 0.55)) set(x, y, '#2a2418')
+        if (n(x, y, 12) > 0.88 || (x % 7 === 2 && n(y, x, 13) > 0.55)) set(x, y, '#4a4234')
       }
     }
   },
   birchEnd: (set) => rings(set, '#efeae0', '#c8c2b4', 14),
-  spruceBark: (set) => bark(set, ['#3d2a1a', '#4a3420', '#2a1c12'], '#1a1008', 15),
-  spruceEnd: (set) => rings(set, '#6b4a22', '#3d2a1a', 16),
-  leaves: (set) => noise(set, ['#163820', '#2f7a28', '#5a9a3c', '#8fd15a'], 17),
+  spruceBark: (set) => bark(set, ['#5c4430', '#6c5440', '#4c3828'], '#3a2c1c', 15),
+  spruceEnd: (set) => rings(set, '#7a5630', '#5c4430', 16),
+  leaves: (set) => noise(set, ['#1e4a28', '#2f7a28', '#5a9a3c', '#8fd15a'], 17),
   birchLeaves: (set) => noise(set, ['#4a8c28', '#8fd15a', '#c6f06a', '#2f7a28'], 18),
-  spruceLeaves: (set) => noise(set, ['#0e2414', '#1e4a28', '#3a6a3e', '#24661e'], 19),
+  spruceLeaves: (set) => noise(set, ['#163820', '#24661e', '#3a6a3e', '#2f7a28'], 19),
   snow: (set) => noise(set, ['#b8c4d4', '#ffffff', '#e8eef5', '#8a9aac'], 20),
   coal: (set) => {
     cobble(set, ['#7b7b7b', '#6e6e6e', '#8a8a8a'], '#5c5c5c', 21)
     for (let y = 0; y < S; y++) {
       for (let x = 0; x < S; x++) {
-        if (n(x, y, 22) > 0.72) set(x, y, n(x, y, 23) > 0.5 ? '#1a1a1a' : '#2a2a2a')
+        if (n(x, y, 22) > 0.72) set(x, y, n(x, y, 23) > 0.5 ? '#2a2a2a' : '#3a3a3a')
       }
     }
   },
@@ -206,9 +206,9 @@ const paints: Record<string, (set: (x: number, y: number, hex: string) => void) 
   },
   wool: (set) => wool(set, '#f4f0e6', '#d8d2c6', 36),
   cloud: (set) => wool(set, '#ffffff', '#9aa6b4', 37),
-  plank: (set) => planks(set, ['#c4a06a', '#b08c58', '#d4b27a'], '#6b4a22', 38),
+  plank: (set) => planks(set, ['#c4a06a', '#b08c58', '#d4b27a'], '#7a5630', 38),
   cobble: (set) => cobble(set, ['#8b8680', '#7b7b7b', '#9a9a9a', '#6e6e6e'], '#4a4a4a', 39),
-  darkOak: (set) => planks(set, ['#3a2a22', '#4a3428', '#2a1c16'], '#1a1008', 40),
+  darkOak: (set) => planks(set, ['#5c4638', '#6c5640', '#4c3a30'], '#3a2c1c', 40),
   glowstone: (set) => {
     for (let y = 0; y < S; y++) {
       for (let x = 0; x < S; x++) {
@@ -220,14 +220,14 @@ const paints: Record<string, (set: (x: number, y: number, hex: string) => void) 
   lanternOff: (set) => noise(set, ['#e0892a', '#c46e18', '#8a4a12', '#f2a03a'], 42),
   planeRed: (set) => wool(set, '#c43c32', '#a02820', 43),
   planeCream: (set) => planks(set, ['#efe6d2', '#e0d4b8', '#f4ead2'], '#b08c58', 44),
-  planeDark: (set) => planks(set, ['#3a2a22', '#2a1c16'], '#1a1008', 45),
+  planeDark: (set) => planks(set, ['#5c4638', '#4c3a30'], '#3a2c1c', 45),
   gold: (set) => {
     cobble(set, ['#d4af37', '#f2d04a', '#c49a20'], '#8a7010', 46)
   },
   skin: (set) => noise(set, ['#c68642', '#d4a05a', '#b87438', '#e0b070'], 47),
   shirt: (set) => wool(set, '#3d5a9a', '#2a4480', 48),
   pants: (set) => wool(set, '#3a4a2a', '#2a381c', 49),
-  hat: (set) => wool(set, '#2b2218', '#1a140e', 50),
+  hat: (set) => wool(set, '#3a2e22', '#2a2218', 50),
 }
 
 const faces: Record<string, [string, string, string]> = {

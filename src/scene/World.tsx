@@ -33,8 +33,8 @@ export function World({
     >
       <color attach="background" args={['#9fd6f7']} />
       <fog attach="fog" args={['#a8d8f5', 75, 190]} />
-      <hemisphereLight args={['#c8e8ff', '#5a7a3a', 0.9]} />
-      <directionalLight position={[20, 80, 10]} intensity={1.45} />
+      <hemisphereLight args={['#c8e8ff', '#6a8a4a', 1.05]} />
+      <directionalLight position={[20, 80, 10]} intensity={1.4} />
       <Sky
         sunPosition={[20, 80, 30]}
         turbidity={2.2}
