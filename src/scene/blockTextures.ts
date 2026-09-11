@@ -14,6 +14,26 @@ function tex(paint: (set: (x: number, y: number, hex: string) => void) => void) 
     ctx.fillStyle = hex
     ctx.fillRect(x, y, 1, 1)
   })
+  const img = ctx.getImageData(0, 0, S, S)
+  const d = img.data
+  let r = 0
+  let g = 0
+  let b = 0
+  for (let i = 0; i < d.length; i += 4) {
+    r += d[i]
+    g += d[i + 1]
+    b += d[i + 2]
+  }
+  const count = S * S
+  r /= count
+  g /= count
+  b /= count
+  for (let i = 0; i < d.length; i += 4) {
+    d[i] = (d[i] + r) * 0.5
+    d[i + 1] = (d[i + 1] + g) * 0.5
+    d[i + 2] = (d[i + 2] + b) * 0.5
+  }
+  ctx.putImageData(img, 0, 0)
   const texture = new THREE.CanvasTexture(canvas)
   texture.magFilter = THREE.NearestFilter
   texture.minFilter = THREE.NearestFilter
