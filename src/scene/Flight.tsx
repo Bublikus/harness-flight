@@ -50,6 +50,9 @@ export function Flight({
   const yawRate = useRef(0)
   const speed = useRef(0)
   const parkedAt = useRef(0)
+  const bankZ = useRef(0)
+  const pitchX = useRef(0)
+  const windPhase = useRef(Math.random() * TWO_PI)
 
   useFrame((state, dt) => {
     const g = group.current
@@ -121,8 +124,8 @@ export function Flight({
       g.rotation.y = yaw.current
       const bank = (-yawRate.current / YAW_RATE) * 0.68 * (capturing ? 0.5 : 1)
       const pitch = (turning ? 0.16 : 0.07) * (capturing ? steer : 1)
-      g.rotation.z += (bank - g.rotation.z) * (1 - Math.exp(-d * 6))
-      g.rotation.x += (pitch - g.rotation.x) * (1 - Math.exp(-d * 5))
+      bankZ.current += (bank - bankZ.current) * (1 - Math.exp(-d * 6))
+      pitchX.current += (pitch - pitchX.current) * (1 - Math.exp(-d * 5))
 
       if (
         g.position.distanceTo(dest) < DOCK_RADIUS &&
@@ -146,9 +149,38 @@ export function Flight({
       g.position.z += (dest.z - g.position.z) * settle
       g.position.y += (dest.y + bob - g.position.y) * settle
       g.rotation.y = yaw.current
-      g.rotation.z += (0 - g.rotation.z) * (1 - Math.exp(-d * 3))
-      g.rotation.x += (0 - g.rotation.x) * (1 - Math.exp(-d * 3))
+      bankZ.current += (0 - bankZ.current) * (1 - Math.exp(-d * 3))
+      pitchX.current += (0 - pitchX.current) * (1 - Math.exp(-d * 3))
     }
+
+    // Soft wind buffet: always-on, irregular phase drift + occasional gusts.
+    const t = state.clock.elapsedTime
+    windPhase.current +=
+      d *
+      (0.2 +
+        0.14 * Math.sin(t * 0.09) +
+        0.1 * Math.sin(t * 0.23 + 1.7) +
+        0.07 * Math.sin(t * 0.51 + 0.4))
+    const p = windPhase.current
+    // ~1.8× prior peak; no speed/capture damp — stays on at checkpoints.
+    const windAmp = 0.1
+    const gustPulse =
+      Math.pow(0.5 + 0.5 * Math.sin(t * 0.27 + p * 0.35), 4) *
+      (0.55 + 0.45 * Math.sin(t * 0.63 + 2.1))
+    const gust =
+      Math.sin(t * 1.15 + p) * 0.4 +
+      Math.sin(t * 2.1 + p * 1.7 + 1.2) * 0.26 +
+      Math.sin(t * 3.55 + p * 0.6 + 2.1) * 0.16 +
+      Math.sin(t * 0.48 + p * 2.2 + 0.8) * 0.18
+    const roll = gust * windAmp * (1 + 0.55 * gustPulse)
+    g.rotation.z = bankZ.current + roll
+    g.rotation.x =
+      pitchX.current +
+      (Math.sin(t * 0.95 + p * 0.9 + 0.4) * 0.55 +
+        Math.sin(t * 2.4 + p * 1.4) * 0.3 +
+        Math.sin(t * 1.7 + p * 2.1 + 1.1) * 0.15) *
+        windAmp *
+        (0.28 + 0.12 * gustPulse)
 
     planePose.pos.copy(g.position)
     planePose.valid = true
