@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import * as THREE from 'three'
-import { C } from './colors'
+import { blockMaterials } from './blockTextures'
 import { SLIDES, WAYPOINT_SPACING } from '../slides'
 
 const W = 22
@@ -28,40 +28,39 @@ function isRiver(x: number, z: number) {
 type Bucket = {
   id: string
   pos: number[]
-  color: string
   scale?: [number, number, number]
 }
 
-function bucket(id: string, color: string, scale?: [number, number, number]): Bucket {
-  return { id, pos: [], color, scale }
+function bucket(id: string, scale?: [number, number, number]): Bucket {
+  return { id, pos: [], scale }
 }
 
 function build(): Bucket[] {
   const B = {
-    grass: bucket('grass', C.grass),
-    dirt: bucket('dirt', C.dirt),
-    stone: bucket('stone', C.stone),
-    gravel: bucket('gravel', C.gravel),
-    water: bucket('water', C.water),
-    sand: bucket('sand', C.sand),
-    wood: bucket('wood', C.wood),
-    birch: bucket('birch', C.birch),
-    spruce: bucket('spruce', C.spruce),
-    leaves: bucket('leaves', C.leaves),
-    birchLeaves: bucket('birchLeaves', C.birchLeaves),
-    spruceLeaves: bucket('spruceLeaves', C.spruceLeaves),
-    snow: bucket('snow', C.snow),
-    coal: bucket('coal', C.coal),
-    iron: bucket('iron', C.iron),
-    flowerY: bucket('flowerY', C.flowerY, [0.35, 0.7, 0.35]),
-    flowerR: bucket('flowerR', C.flowerR, [0.35, 0.7, 0.35]),
-    tall: bucket('tall', C.grassDark, [0.22, 1.05, 0.22]),
-    reed: bucket('reed', C.reed, [0.28, 1.9, 0.28]),
-    lily: bucket('lily', C.lily, [0.9, 0.12, 0.9]),
-    pumpkin: bucket('pumpkin', C.pumpkin, [0.85, 0.75, 0.85]),
-    mush: bucket('mush', C.mushroom, [0.45, 0.45, 0.45]),
-    wool: bucket('wool', C.wool, [0.7, 0.55, 0.9]),
-    cloud: bucket('cloud', '#f4f7fb'),
+    grass: bucket('grass'),
+    dirt: bucket('dirt'),
+    stone: bucket('stone'),
+    gravel: bucket('gravel'),
+    water: bucket('water'),
+    sand: bucket('sand'),
+    wood: bucket('wood'),
+    birch: bucket('birch'),
+    spruce: bucket('spruce'),
+    leaves: bucket('leaves'),
+    birchLeaves: bucket('birchLeaves'),
+    spruceLeaves: bucket('spruceLeaves'),
+    snow: bucket('snow'),
+    coal: bucket('coal'),
+    iron: bucket('iron'),
+    flowerY: bucket('flowerY', [0.35, 0.7, 0.35]),
+    flowerR: bucket('flowerR', [0.35, 0.7, 0.35]),
+    tall: bucket('tall', [0.22, 1.05, 0.22]),
+    reed: bucket('reed', [0.28, 1.9, 0.28]),
+    lily: bucket('lily', [0.9, 0.12, 0.9]),
+    pumpkin: bucket('pumpkin', [0.85, 0.75, 0.85]),
+    mush: bucket('mush', [0.45, 0.45, 0.45]),
+    wool: bucket('wool', [0.7, 0.55, 0.9]),
+    cloud: bucket('cloud'),
   }
 
   const push = (b: Bucket, x: number, y: number, z: number) => {
@@ -174,7 +173,7 @@ function Instanced({ data }: { data: Bucket }) {
   const mesh = useMemo(() => {
     const [sx, sy, sz] = data.scale ?? [1, 1, 1]
     const geo = new THREE.BoxGeometry(sx, sy, sz)
-    const mat = new THREE.MeshLambertMaterial({ color: data.color })
+    const mat = blockMaterials(data.id, [sx, sy, sz])
     const m = new THREE.InstancedMesh(geo, mat, data.pos.length / 3)
     const dummy = new THREE.Object3D()
     for (let i = 0; i < data.pos.length; i += 3) {
@@ -183,6 +182,13 @@ function Instanced({ data }: { data: Bucket }) {
       m.setMatrixAt(i / 3, dummy.matrix)
     }
     m.instanceMatrix.needsUpdate = true
+    const tint = new THREE.Color()
+    for (let i = 0; i < data.pos.length; i += 3) {
+      const shade = 0.78 + n2(data.pos[i] + 3, data.pos[i + 2] + 7) * 0.44
+      tint.setRGB(shade, shade, shade)
+      m.setColorAt(i / 3, tint)
+    }
+    if (m.instanceColor) m.instanceColor.needsUpdate = true
     m.frustumCulled = false
     return m
   }, [data])
