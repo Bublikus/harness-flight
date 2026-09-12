@@ -28,6 +28,10 @@ const SPEED_RESP_SPOOL = 1.25
 /** Hop age (s) over which speed response ramps spool → full. */
 const SPOOL_IN = 0.2
 const SPOOL_OUT = 1.65
+/** Wall-clock brake: current speed → 0. Integral of the ease is v0*T/2. */
+const BRAKE_T = 0.7
+/** Enter a bit before v0*T/2 so a late frame cannot skip the zone. */
+const BRAKE_PAD = 1.12
 const YAW_RATE = 3.3
 const LOOKAHEAD = 14
 const SLOWDOWN_RADIUS = 28
@@ -302,6 +306,9 @@ export function Flight({
   const lensFeel = useRef(0)
   const hopAge = useRef(0)
   const hopSpeed = useRef(1)
+  const braking = useRef(false)
+  const brakeFrom = useRef(0)
+  const brakeAge = useRef(0)
   const skyBlend = useRef(0)
   const orbitTarget = useRef({ x: 0, y: 0 })
   const orbit = useRef({ x: 0, y: 0 })
@@ -343,6 +350,9 @@ export function Flight({
       approaching.current = false
       arrived.current = false
       hopAge.current = 0
+      braking.current = false
+      brakeFrom.current = 0
+      brakeAge.current = 0
       hopSpeed.current = THREE.MathUtils.clamp(
         along / ROUTE_WAVELENGTH,
         HOP_SPEED_MIN,
@@ -399,21 +409,40 @@ export function Flight({
 
       const aligned = THREE.MathUtils.clamp(Math.cos(err), 0, 1)
       const turnFactor = turning ? 0.32 + 0.28 * aligned : 0.55 + 0.45 * aligned
-      const cruise =
-        0.18 +
-        THREE.MathUtils.smoothstep(along, ARRIVAL_RADIUS, SLOWDOWN_RADIUS) * 0.82
-      const approach = 0.18 * THREE.MathUtils.smoothstep(horiz, 0, ARRIVAL_RADIUS)
-      const targetSpeed = pivot
-        ? 0
-        : CRUISE *
-          hopSpeed.current *
-          turnFactor *
-          (capturing ? approach : cruise)
-      const spool = THREE.MathUtils.smoothstep(hopAge.current, SPOOL_IN, SPOOL_OUT)
-      const speedResp =
-        SPEED_RESP_SPOOL + (SPEED_RESP - SPEED_RESP_SPOOL) * spool
-      speed.current +=
-        (targetSpeed - speed.current) * (1 - Math.exp(-d * speedResp))
+      if (
+        !braking.current &&
+        !pivot &&
+        speed.current > DOCK_SPEED &&
+        along <=
+          Math.max(
+            ARRIVAL_RADIUS,
+            speed.current * BRAKE_T * 0.5 * BRAKE_PAD,
+          )
+      ) {
+        braking.current = true
+        brakeFrom.current = speed.current
+        brakeAge.current = 0
+      }
+
+      let brakeU = 0
+      if (braking.current) {
+        brakeAge.current += d
+        brakeU = THREE.MathUtils.clamp(brakeAge.current / BRAKE_T, 0, 1)
+        // Hermite ease-out: (1-u)^2 (1+2u). Stays fast, then rolls off; ∫ = v0 T/2.
+        const rest = 1 - brakeU
+        speed.current = brakeFrom.current * rest * rest * (1 + 2 * brakeU)
+      } else {
+        const targetSpeed = pivot ? 0 : CRUISE * hopSpeed.current * turnFactor
+        const spool = THREE.MathUtils.smoothstep(
+          hopAge.current,
+          SPOOL_IN,
+          SPOOL_OUT,
+        )
+        const speedResp =
+          SPEED_RESP_SPOOL + (SPEED_RESP - SPEED_RESP_SPOOL) * spool
+        speed.current +=
+          (targetSpeed - speed.current) * (1 - Math.exp(-d * speedResp))
+      }
 
       if (pivot) {
         g.position.lerp(dest, 1 - Math.exp(-d * CAPTURE))
@@ -421,14 +450,20 @@ export function Flight({
         g.position.x += Math.sin(yaw.current) * speed.current * d
         g.position.z += Math.cos(yaw.current) * speed.current * d
         g.position.y += (dest.y - g.position.y) * (1 - Math.exp(-d * 1.5))
-        // Capture fade is 0 at the 2u boundary so the pull cannot spike velocity.
-        if (capturing && dist > 1e-5) {
-          const fade = THREE.MathUtils.smoothstep(
-            ARRIVAL_RADIUS - dist,
-            0,
-            ARRIVAL_RADIUS,
-          )
-          g.position.lerp(dest, 1 - Math.exp(-d * CAPTURE * fade))
+        // Skip capture lerp during the 0.7s roll-in; it was the slam.
+        if (dist > 1e-5 && !(braking.current && brakeU < 1)) {
+          const fade = capturing
+            ? THREE.MathUtils.smoothstep(
+                ARRIVAL_RADIUS - dist,
+                0,
+                ARRIVAL_RADIUS,
+              )
+            : braking.current
+              ? 1
+              : 0
+          if (fade > 0) {
+            g.position.lerp(dest, 1 - Math.exp(-d * CAPTURE * fade))
+          }
         }
       }
 
