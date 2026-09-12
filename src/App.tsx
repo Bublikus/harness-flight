@@ -6,7 +6,6 @@ import type { TurnDirection } from './scene/Flight'
 import {
   audioEnabled,
   playHopWhoosh,
-  playStartBlip,
   readMuted,
   readVolume,
   setVolume,
@@ -63,7 +62,6 @@ export default function App() {
       return
     }
     unlockAudio()
-    playHopWhoosh()
     setFlying(true)
     setApproaching(false)
     setTurnDirection(turn)
@@ -81,7 +79,6 @@ export default function App() {
 
   const startTalk = useCallback(() => {
     unlockAudio()
-    playStartBlip()
     playHopWhoosh()
     setStarted(true)
   }, [])

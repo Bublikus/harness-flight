@@ -6,6 +6,7 @@ import { SLIDES, type Slide } from '../slides'
 import { waypointPose } from './route'
 import { blockMaterials } from './blockTextures'
 import { playRiseWhoosh } from './FlightAudio'
+import { terrainHeight } from './Terrain'
 import { slidePose } from './worldPoses'
 
 const WIDTH = 16
@@ -14,6 +15,8 @@ const HEIGHT = 7.5
 const SUNK_Y = -(HEIGHT + 0.5) / 2 - 1
 /** Sunk start size vs parked (1). Large enough to read mid-flight; small enough to read as depth. */
 const ZOOM_SUNK = 0.48
+/** Tall grass / lower canopy — disappear whoosh when the board bottom crosses this. */
+const FOLIAGE = 2
 /** Board-local swoop (side / behind / toward camera). Spring overshoot past rise=1 is the settle. */
 function flight(rise: number, parkedY: number, yaw: number, side: 1 | -1) {
   // Drive rise straight from the spring — no piecewise remaps (those kink velocity at rise=1).
@@ -162,6 +165,9 @@ function WorldSlideCard({
   const fitAt = useRef(new THREE.Vector3())
   const side = useRef<1 | -1>(Math.random() < 0.5 ? 1 : -1)
   const rising = useRef(false)
+  /** One disappear whoosh per lower (foliage contact). */
+  const contactSfx = useRef(false)
+  const prevBottom = useRef(Number.POSITIVE_INFINITY)
   const { gl, viewport } = useThree()
   const slide = SLIDES[index]
   const pose = useMemo(() => routePose(index, facing), [index, facing])
@@ -196,7 +202,10 @@ function WorldSlideCard({
     if (!card) return
     const target = raised ? 1 : 0
     if (active) slidePose.index = index
-    if (raised && !rising.current) playRiseWhoosh()
+    if (raised && !rising.current) {
+      playRiseWhoosh()
+      contactSfx.current = false
+    }
     rising.current = raised
     if (
       !target &&
@@ -219,6 +228,7 @@ function WorldSlideCard({
     // Target-based params: soft appear (incl. settle), snappy sink. Do NOT flip on
     // overshoot (target > rise) — that snaps k/d exactly when the first bounce starts.
     const appear = target === 1
+    const prevRise = rise.current
     velocity.current =
       (velocity.current + (target - rise.current) * (appear ? 40 : 68) * d) *
       Math.exp(-(appear ? 8.5 : 9) * d)
@@ -235,6 +245,22 @@ function WorldSlideCard({
     scale.current = THREE.MathUtils.damp(scale.current, parked, 8, d)
     const s = scale.current * f.zoom
     card.scale.setScalar(s)
+
+    const half = ((HEIGHT + 0.5) * 0.5) * s
+    const bottom = f.y - half
+    const foliageLine =
+      terrainHeight(pose.x + f.x, pose.z + f.z) + FOLIAGE
+    if (
+      !appear &&
+      prevRise > 0.05 &&
+      !contactSfx.current &&
+      prevBottom.current >= foliageLine &&
+      bottom < foliageLine
+    ) {
+      contactSfx.current = true
+      playRiseWhoosh()
+    }
+    prevBottom.current = bottom
 
     if (active) {
       card.updateWorldMatrix(true, false)
