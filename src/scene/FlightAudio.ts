@@ -313,6 +313,73 @@ export function playFireworkBurst(secondary = false) {
 /** Exponential approach for bed params — avoids clicks when flying ↔ idle flips. */
 const BED_TAU = 0.18
 
+/** Cap stacked flyby chirps so a flock never becomes a chorus. */
+const BIRD_MAX = 2
+let birdVoices = 0
+
+/**
+ * Distant flyby chirp — triangle sweep + thin noise, then a 1.1 kHz HP / 2.6 kHz LP
+ * air box so it reads far, not just quieter. Peak ~0.008 (was ~0.03).
+ */
+export function playBirdChirp() {
+  if (!audioEnabled() || !live() || !master || !ctx || !noise || readMuted() || birdVoices >= BIRD_MAX)
+    return false
+  const now = ctx.currentTime
+  const chirpDur = 0.085 + Math.random() * 0.045
+  const flutterDur = 0.055 + Math.random() * 0.03
+  const f0 = 1950 + Math.random() * 950
+
+  const hp = ctx.createBiquadFilter()
+  hp.type = 'highpass'
+  hp.frequency.value = 1100
+  hp.Q.value = 0.7
+  const lp = ctx.createBiquadFilter()
+  lp.type = 'lowpass'
+  lp.frequency.value = 2600
+  lp.Q.value = 0.65
+  hp.connect(lp).connect(master)
+
+  const o = ctx.createOscillator()
+  o.type = 'triangle'
+  o.frequency.setValueAtTime(f0, now)
+  o.frequency.exponentialRampToValueAtTime(f0 * (0.52 + Math.random() * 0.16), now + chirpDur)
+  const og = ctx.createGain()
+  const peak = 0.007 + Math.random() * 0.003
+  og.gain.setValueAtTime(0.0001, now)
+  og.gain.exponentialRampToValueAtTime(peak, now + 0.01)
+  og.gain.exponentialRampToValueAtTime(0.0001, now + chirpDur)
+  o.connect(og).connect(hp)
+
+  const src = ctx.createBufferSource()
+  src.buffer = noise
+  const bp = ctx.createBiquadFilter()
+  bp.type = 'bandpass'
+  bp.Q.value = 1.35 + Math.random() * 0.4
+  bp.frequency.setValueAtTime(2200 + Math.random() * 900, now)
+  const ng = ctx.createGain()
+  ng.gain.setValueAtTime(0.0001, now)
+  ng.gain.exponentialRampToValueAtTime(0.0035 + Math.random() * 0.0015, now + 0.008)
+  ng.gain.exponentialRampToValueAtTime(0.0001, now + flutterDur)
+  src.connect(bp).connect(ng).connect(hp)
+
+  birdVoices++
+  o.onended = () => {
+    birdVoices = Math.max(0, birdVoices - 1)
+    o.disconnect()
+    og.disconnect()
+    src.disconnect()
+    bp.disconnect()
+    ng.disconnect()
+    hp.disconnect()
+    lp.disconnect()
+  }
+  o.start(now)
+  o.stop(now + chirpDur + 0.02)
+  src.start(now)
+  src.stop(now + flutterDur + 0.02)
+  return true
+}
+
 /** `cruise` is the same 0–1 intensity WindMotes uses (`windVis`). */
 export function setFlightMix(flying: boolean, cruise: number) {
   if (!engineGain || !windGain || !ctx) return

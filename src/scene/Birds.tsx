@@ -2,6 +2,7 @@ import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { blockMaterials } from './blockTextures'
+import { audioEnabled, playBirdChirp } from './FlightAudio'
 import { pathLateral, pathX, ROUTE_VALLEY, ROUTE_Z_MAX, ROUTE_Z_MIN } from './route'
 import { terrainHeight, treePerches } from './Terrain'
 import { planePose, slidePose } from './worldPoses'
@@ -35,6 +36,13 @@ const OSC_ALONG = 1.2
 const PLANE_R = 5.4
 const PLANE_HARD = 4.6
 const PLANE_REP = 5.8
+/** Close enough for a flyby chirp; outside flock-wide chatter (PLANE_R is 5.4). */
+const HEAR_R = 9.2
+const HEAR_R_SQ = HEAR_R * HEAR_R
+const CHIRP_COOLDOWN = 2.8
+const CHIRP_GAP = 0.6
+/** Min closing speed so we fire on inbound passes, not birds already leaving. */
+const CHIRP_CLOSE = 0.8
 /** Inflate slide half-extents; collide while the mesh is still visibly risen. */
 const SLIDE_RISE_BLOCK = 0.08
 const SLIDE_PAD = 0.9
@@ -600,6 +608,8 @@ export function Birds() {
   const nextFlybyAt = useRef(4)
   const sessionIndex = useRef(-1)
   const flybyAllowed = useRef(true)
+  const chirpAt = useMemo(() => new Float64Array(COUNT), [])
+  const nextChirpAt = useRef(0)
   const bodyMat = useMemo(() => blockMaterials('hat') as THREE.Material, [])
   const wingMat = useMemo(() => blockMaterials('planeDark') as THREE.Material, [])
   const beakMat = useMemo(() => blockMaterials('gold') as THREE.Material, [])
@@ -940,6 +950,33 @@ export function Birds() {
     wingL.instanceMatrix.needsUpdate = true
     wingR.instanceMatrix.needsUpdate = true
     beak.instanceMatrix.needsUpdate = true
+
+    if (audioEnabled() && planePose.valid && time >= nextChirpAt.current) {
+      let best = -1
+      let bestD = HEAR_R_SQ
+      const px = planePose.pos.x
+      const py = planePose.pos.y
+      const pz = planePose.pos.z
+      const pvx = Math.sin(planePose.yaw) * planePose.speed
+      const pvz = Math.cos(planePose.yaw) * planePose.speed
+      for (let i = 0; i < birds.length; i++) {
+        const b = birds[i]
+        if (b.mode === 'perch' || time < chirpAt[i]) continue
+        const dx = b.p.x - px
+        const dy = b.p.y - py
+        const dz = b.p.z - pz
+        const dSq = dx * dx + dy * dy + dz * dz
+        if (dSq >= bestD || dSq < 1e-8) continue
+        const closing = (b.v.x - pvx) * dx + b.v.y * dy + (b.v.z - pvz) * dz
+        if (closing >= -CHIRP_CLOSE) continue
+        bestD = dSq
+        best = i
+      }
+      if (best >= 0 && playBirdChirp()) {
+        chirpAt[best] = time + CHIRP_COOLDOWN
+        nextChirpAt.current = time + CHIRP_GAP
+      }
+    }
   })
 
   return (
