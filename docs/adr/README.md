@@ -38,6 +38,7 @@ Index of lasting presentation choices. Procedure: `adr` skill.
 | [0032](0032-persistent-h-hide-slides.md) | Persistent H-hide across waypoints | Accepted |
 | [0033](0033-sky-finale-after-last-slide.md) | Sky finale after last slide | Accepted |
 | [0034](0034-hermite-arrival-bridge.md) | Hermite arrival bridge | Accepted |
+| [0035](0035-sharp-plane-over-motion-blur.md) | Sharp plane over desktop motion blur | Accepted |
 
 Restore a talk version with `git log --oneline` then `git checkout <commit>`:
 

@@ -8,6 +8,7 @@ import { Fireworks } from './Fireworks'
 import { Flight, type TurnDirection } from './Flight'
 import { Terrain } from './Terrain'
 import { WorldSlide } from './WorldSlide'
+import { PLANE_LAYER } from './layers'
 import { planePose } from './worldPoses'
 
 const SpeedMotionBlur = lazy(() =>
@@ -94,7 +95,10 @@ function SunLight({ mobile }: { mobile: boolean }) {
   return (
     <>
       <directionalLight
-        ref={light}
+        ref={(l) => {
+          light.current = l
+          l?.layers.enable(PLANE_LAYER)
+        }}
         castShadow
         intensity={1.55}
         position={[-34, 52, -38]}
@@ -146,11 +150,17 @@ export function World({
       shadows={mobile ? true : 'soft'}
       camera={{ fov: 58, near: 0.1, far: 320, position: [0, 14.2, -8] }}
       dpr={mobile ? [1, 1] : [1, 1.5]}
-      onCreated={({ camera }) => camera.lookAt(0, 11.5, 8)}
+      onCreated={({ camera }) => {
+        camera.layers.enable(PLANE_LAYER)
+        camera.lookAt(0, 11.5, 8)
+      }}
     >
       <color attach="background" args={['#f3e0c4']} />
       <fog attach="fog" args={['#6aa8d8', 75, 190]} />
-      <hemisphereLight args={['#c8e8ff', '#6a8a4a', 0.95]} />
+      <hemisphereLight
+        args={['#c8e8ff', '#6a8a4a', 0.95]}
+        ref={(l) => l?.layers.enable(PLANE_LAYER)}
+      />
       <SunLight mobile={mobile} />
       <SoftSky mobile={mobile} />
       <Terrain />

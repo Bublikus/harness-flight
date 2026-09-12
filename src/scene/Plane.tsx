@@ -1,7 +1,8 @@
-import { useMemo, useRef } from 'react'
+import { useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { blockMaterials } from './blockTextures'
+import { PLANE_LAYER } from './layers'
 
 function Voxel({
   p,
@@ -48,14 +49,18 @@ function Snappy() {
 }
 
 export function Plane() {
+  const root = useRef<THREE.Group>(null)
   const prop = useRef<THREE.Mesh>(null)
   const propMat = useMemo(() => blockMaterials('planeDark', [0.12, 1.6, 0.12]), [])
+  useLayoutEffect(() => {
+    root.current?.traverse((o) => o.layers.set(PLANE_LAYER))
+  })
   useFrame((_, dt) => {
     if (prop.current) prop.current.rotation.z += dt * 28
   })
 
   return (
-    <group>
+    <group ref={root}>
       <Voxel p={[0, 0, 0]} s={[1.2, 0.9, 3.4]} kind="planeRed" />
       <Voxel p={[0, 0.15, 1.9]} s={[0.7, 0.7, 0.7]} kind="planeCream" />
       <Voxel p={[0, 0.05, -2]} s={[0.8, 0.7, 0.9]} kind="planeRed" />

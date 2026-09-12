@@ -209,6 +209,7 @@ export function SettingsDock({
       <button type="button" aria-haspopup="true" aria-label="Settings">
         <GearIcon />
       </button>
+      <div className="settings-dock-hit" aria-hidden="true" />
       <div className="settings-dock-pop" role="menu" aria-label="Settings">
         <p className="settings-heading">Graphics</p>
         <button

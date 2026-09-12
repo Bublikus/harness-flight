@@ -283,6 +283,13 @@ button.dot.sky.on {
   gap: 6px;
 }
 
+/* Hug the gear so the abs menu can't float a slider-stack above it.
+   Paint above .sound-dock so the open panel (and its hover bridge) win. */
+.settings-dock {
+  height: max-content;
+  z-index: 1;
+}
+
 .sound-dock > button,
 .settings-dock > button {
   width: 44px;
@@ -349,14 +356,20 @@ button.dot.sky.on {
     transform 0.14s ease;
 }
 
-/* Bridge the 6px visual gap so :hover stays when moving onto the menu. */
-.settings-dock-pop::after {
-  content: '';
+/* Invisible full-width bridge: gap + a bit of gear/menu. Off until the
+   dock is hovered so it cannot steal the sound slider. */
+.settings-dock-hit {
   position: absolute;
-  left: 0;
   right: 0;
-  top: 100%;
-  height: 6px;
+  bottom: 36px;
+  width: 196px;
+  height: 18px;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.001);
+}
+
+.settings-dock:hover .settings-dock-hit {
+  pointer-events: auto;
 }
 
 .settings-dock:hover .settings-dock-pop {
