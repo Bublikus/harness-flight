@@ -2,6 +2,7 @@ import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { isMobileWorld } from './device'
+import { playFireworkBurst, playFireworkLaunch } from './FlightAudio'
 import { FINALE_SKY, ROUTE_END } from './route'
 
 /** Compensates FINALE_SKY along 36→80 so finale cam still sees big cubes. */
@@ -466,6 +467,7 @@ function launch(pool: Spark[], cheap: boolean) {
   s.tr = s.r
   s.tg = s.g
   s.tb = s.b
+  playFireworkLaunch()
 }
 
 export function Fireworks({ active }: { active: boolean }) {
@@ -524,6 +526,7 @@ export function Fireworks({ active }: { active: boolean }) {
       if (s.life <= 0) {
         if (s.rocket) {
           explode(sparks, s.x, s.y, s.z, burst, 0, mobile)
+          playFireworkBurst(false)
           if (s.fuse === 4) {
             const shells = mobile ? 2 : 3
             for (let k = 0; k < shells; k++) {
@@ -540,6 +543,7 @@ export function Fireworks({ active }: { active: boolean }) {
           }
         } else if (s.fuse === 1) {
           explode(sparks, s.x, s.y, s.z, mobile ? 8 : 16, 1, mobile)
+          playFireworkBurst(true)
         } else if (s.fuse === 2) {
           crackle(sparks, s.x, s.y, s.z, [s.r, s.g, s.b], mobile)
         } else if (s.fuse === 3) {
