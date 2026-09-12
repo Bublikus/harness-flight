@@ -276,6 +276,6 @@ button:active:not(:disabled) {
 
 @media (hover: none), (pointer: coarse) {
   .sound-dock {
-    bottom: 100px;
+    display: none;
   }
 }

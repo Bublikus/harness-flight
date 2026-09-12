@@ -4,6 +4,11 @@ const MUTE_KEY = 'harness-flight-mute'
 const VOLUME_KEY = 'harness-flight-volume'
 const MASTER = 0.18
 
+/** Match HUD mobile media: no AudioContext / SFX on touch / coarse pointers. */
+export function audioEnabled() {
+  return !window.matchMedia('(hover: none), (pointer: coarse)').matches
+}
+
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
 let engineGain: GainNode | null = null
@@ -120,6 +125,7 @@ function buildBeds(c: AudioContext, dest: GainNode) {
 
 /** Create / resume the context. Call only from a user gesture. */
 export function unlockAudio() {
+  if (!audioEnabled()) return
   if (!ctx) {
     ctx = new AudioContext()
     master = ctx.createGain()

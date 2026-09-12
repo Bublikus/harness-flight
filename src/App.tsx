@@ -4,6 +4,7 @@ import { Hud, SoundDock, TitleScreen } from './Hud'
 import { World } from './scene/World'
 import type { TurnDirection } from './scene/Flight'
 import {
+  audioEnabled,
   playHopWhoosh,
   playStartBlip,
   readMuted,
@@ -172,16 +173,18 @@ export default function App() {
       ) : (
         <TitleScreen onStart={startTalk} />
       )}
-      <SoundDock
-        muted={muted}
-        volume={volume}
-        onMute={flipMute}
-        onVolume={(next) => {
-          if (started) unlockAudio()
-          setVolume(next)
-          setVol(next)
-        }}
-      />
+      {audioEnabled() && (
+        <SoundDock
+          muted={muted}
+          volume={volume}
+          onMute={flipMute}
+          onVolume={(next) => {
+            if (started) unlockAudio()
+            setVolume(next)
+            setVol(next)
+          }}
+        />
+      )}
     </div>
   )
 }
