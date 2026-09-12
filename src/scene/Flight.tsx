@@ -42,6 +42,10 @@ const ORBIT_PITCH_Y = 1
 const ORBIT_LERP = 5
 const CAM_DIST = 12
 const CAM_HEIGHT = 4.8
+/** Finale glance: lift look-at over the plane (~15% of the old sky-stare). */
+const FINALE_LOOK_LIFT = 6
+/** Finale settle: drop chase height a little (same skyBlend as the glance). */
+const FINALE_CAM_DIP = 0.8
 /** Base chase catch-up; drops while accelerating so the plane pulls ahead. */
 const CAM_FOLLOW = 4.2
 const CAM_FOLLOW_ACCEL = 1.55
@@ -264,6 +268,7 @@ export function Flight({
   index,
   flying,
   facing,
+  finale,
   turnDirection,
   onApproach,
   onArrived,
@@ -271,6 +276,7 @@ export function Flight({
   index: number
   flying: boolean
   facing: 1 | -1
+  finale: boolean
   turnDirection: TurnDirection
   onApproach: () => void
   onArrived: () => void
@@ -296,6 +302,7 @@ export function Flight({
   const lensFeel = useRef(0)
   const hopAge = useRef(0)
   const hopSpeed = useRef(1)
+  const skyBlend = useRef(0)
   const orbitTarget = useRef({ x: 0, y: 0 })
   const orbit = useRef({ x: 0, y: 0 })
 
@@ -525,18 +532,24 @@ export function Flight({
     const orbitEase = 1 - Math.exp(-d * ORBIT_LERP)
     orbit.current.x += (orbitTarget.current.x - orbit.current.x) * orbitEase
     orbit.current.y += (orbitTarget.current.y - orbit.current.y) * orbitEase
+    const skyAim = finale && !flying ? 1 : 0
+    skyBlend.current +=
+      (skyAim - skyBlend.current) * (1 - Math.exp(-d * 1.55))
     const camAz = cameraYaw.current + orbit.current.x * ORBIT_YAW
     tmp.set(Math.sin(camAz), 0, Math.cos(camAz))
     behind
       .copy(g.position)
       .addScaledVector(tmp, -(CAM_DIST + thrust * ACCEL_PULL))
-    behind.y += CAM_HEIGHT + orbit.current.y * ORBIT_PITCH_Y
+    behind.y +=
+      CAM_HEIGHT +
+      orbit.current.y * ORBIT_PITCH_Y -
+      skyBlend.current * FINALE_CAM_DIP
     const follow =
       CAM_FOLLOW_ACCEL + (CAM_FOLLOW - CAM_FOLLOW_ACCEL) * (1 - thrust)
     state.camera.position.lerp(behind, 1 - Math.exp(-d * follow))
     tmp.set(Math.sin(cameraYaw.current), 0, Math.cos(cameraYaw.current))
     look.copy(g.position).addScaledVector(tmp, 6)
-    look.y = g.position.y + 1.15
+    look.y = g.position.y + 1.15 + skyBlend.current * FINALE_LOOK_LIFT
     state.camera.lookAt(look)
 
     const cam = state.camera as THREE.PerspectiveCamera

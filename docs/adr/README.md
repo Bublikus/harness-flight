@@ -30,12 +30,13 @@ Index of lasting presentation choices. Procedure: `adr` skill.
 | [0024](0024-web-audio-procedural-sfx.md) | Web Audio procedural SFX | Accepted |
 | [0025](0025-meandering-route.md) | Seeded meandering route as layout source | Superseded by ADR-0026 |
 | [0026](0026-path-following-hops.md) | Irregular route; hops follow the polyline | Accepted |
-| [0027](0027-last-checkpoint-finale-return.md) | Last-checkpoint about-face; finale on return | Accepted |
+| [0027](0027-last-checkpoint-finale-return.md) | Last-checkpoint about-face; finale on return | Superseded by ADR-0033 |
 | [0028](0028-terminus-mountain-framing.md) | Terminus mountain framing at start/end | Accepted |
 | [0029](0029-mobile-world-lod.md) | Mobile world LOD (coarser terrain + lighter shadows) | Superseded by ADR-0030 |
 | [0030](0030-full-world-mobile-runtime-opts.md) | Full world with mobile runtime opts (chunk stream + cheaper GPU) | Accepted |
 | [0031](0031-desktop-postprocessing-motion-blur.md) | Desktop EffectComposer motion blur scaled by plane speed | Accepted |
 | [0032](0032-persistent-h-hide-slides.md) | Persistent H-hide across waypoints | Accepted |
+| [0033](0033-sky-finale-after-last-slide.md) | Sky finale after last slide | Accepted |
 
 Restore a talk version with `git log --oneline` then `git checkout <commit>`:
 

@@ -1,6 +1,6 @@
 # ADR-0027: Last-checkpoint about-face; finale on return
 
-- Status: Accepted
+- Status: Superseded by ADR-0033
 - Date: 2026-09-12
 - Deciders: this session
 

@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import { Beacons } from './Beacons'
 import { Birds } from './Birds'
 import { isMobileWorld } from './device'
+import { Fireworks } from './Fireworks'
 import { Flight, type TurnDirection } from './Flight'
 import { Terrain } from './Terrain'
 import { WorldSlide } from './WorldSlide'
@@ -155,17 +156,18 @@ export function World({
       <Beacons current={index} />
       <WorldSlide
         index={index}
-        finale={finale}
         started={started}
         flying={flying}
         approaching={approaching}
         facing={facing}
         hidden={slideHidden}
       />
+      <Fireworks active={finale && !flying} />
       <Flight
         index={index}
         flying={flying}
         facing={facing}
+        finale={finale}
         turnDirection={turnDirection}
         onApproach={onApproach}
         onArrived={onArrived}

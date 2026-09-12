@@ -188,6 +188,14 @@ button.dot.done {
   background: #8fd15a;
 }
 
+button.dot.sky {
+  background: rgba(210, 160, 255, 0.45);
+}
+
+button.dot.sky.on {
+  background: #e8b0ff;
+}
+
 .title-screen {
   position: absolute;
   inset: 0;

@@ -13,7 +13,7 @@ import {
   toggleMuted,
   unlockAudio,
 } from './scene/FlightAudio'
-import { LAST_CHECKPOINT, SLIDES } from './slides'
+import { FINALE_PAGE, LAST_CHECKPOINT, waypointIndex } from './slides'
 import { usePresentationSync } from './presentationSync'
 import './index.css'
 
@@ -32,49 +32,52 @@ export default function App() {
   const [approaching, setApproaching] = useState(false)
   const [turnDirection, setTurnDirection] = useState<TurnDirection>(0)
   const [facing, setFacing] = useState<1 | -1>(1)
-  const [seenLast, setSeenLast] = useState(false)
-  const [finaleReady, setFinaleReady] = useState(false)
-  const [spunAtLast, setSpunAtLast] = useState(false)
+  const [pendingFinale, setPendingFinale] = useState(false)
   /** Session toggle: boards stay sunk across hops until H again. */
   const [slidesHidden, setSlidesHidden] = useState(false)
   const [muted, setMuted] = useState(readMuted)
   const [volume, setVol] = useState(readVolume)
-  const upTarget = index + facing
-  const downTarget = index - facing
-  const finale = index === LAST_CHECKPOINT && finaleReady
-  const pastEnd = upTarget >= SLIDES.length
+  const finale = index === FINALE_PAGE
+  const waypoint = waypointIndex(index)
+  const upTarget = finale ? FINALE_PAGE + 1 : index + facing
+  const rawDown = finale ? LAST_CHECKPOINT : index - facing
+  const downTarget = !finale && rawDown === FINALE_PAGE ? -1 : rawDown
 
   const go = useCallback((next: number, turn: TurnDirection = 0) => {
-    if (next < 0 || next >= SLIDES.length || next === index) return
+    if (next < 0 || next > FINALE_PAGE) return
+    if (next === index) {
+      setPendingFinale(false)
+      return
+    }
+    const fromWp = waypointIndex(index)
+    const toWp = waypointIndex(next)
+    if (fromWp === toWp) {
+      if (flying && next === FINALE_PAGE) {
+        setPendingFinale(true)
+        return
+      }
+      if (flying) return
+      setPendingFinale(false)
+      setBackIndex(index)
+      setIndex(next)
+      return
+    }
     unlockAudio()
     playHopWhoosh()
     setFlying(true)
     setApproaching(false)
     setTurnDirection(turn)
-    if (index === LAST_CHECKPOINT && next !== LAST_CHECKPOINT && seenLast)
-      setFinaleReady(true)
-    if (next !== LAST_CHECKPOINT) setSpunAtLast(false)
-    if ((next - index) * facing < 0)
+    setPendingFinale(next === FINALE_PAGE)
+    if ((toWp - fromWp) * facing < 0)
       setFacing(facing === 1 ? -1 : 1)
-    setBackIndex(index)
-    setIndex(next)
-  }, [facing, index, seenLast])
-
-  const aboutFace = useCallback(() => {
-    unlockAudio()
-    playHopWhoosh()
-    setFlying(true)
-    setApproaching(false)
-    setTurnDirection(1)
-    setFacing((f) => (f === 1 ? -1 : 1))
-    setSpunAtLast(true)
-  }, [])
+    setBackIndex(fromWp)
+    setIndex(toWp)
+  }, [facing, flying, index])
 
   const flyForward = useCallback(() => {
-    if (!flying && index === LAST_CHECKPOINT && facing === 1 && pastEnd)
-      aboutFace()
-    else go(upTarget)
-  }, [aboutFace, facing, flying, go, index, pastEnd, upTarget])
+    if (index === FINALE_PAGE) return
+    go(upTarget)
+  }, [go, index, upTarget])
 
   const startTalk = useCallback(() => {
     unlockAudio()
@@ -83,7 +86,7 @@ export default function App() {
     setStarted(true)
   }, [])
 
-  usePresentationSync(index, (next) => {
+  usePresentationSync(waypoint, (next) => {
     setStarted(true)
     if (next !== index) go(next)
   })
@@ -131,24 +134,27 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [started, upTarget, downTarget, flyForward, go, turnBack, startTalk, flipMute])
+  }, [started, downTarget, flyForward, go, turnBack, startTalk, flipMute])
 
   return (
     <div className="app">
       <World
-        index={index}
+        index={waypoint}
         started={started}
         flying={flying}
         approaching={approaching}
         facing={facing}
         finale={finale}
-        slideHidden={slidesHidden || spunAtLast}
+        slideHidden={slidesHidden || finale || pendingFinale}
         turnDirection={turnDirection}
         onApproach={() => setApproaching(true)}
         onArrived={() => {
           setFlying(false)
           setApproaching(false)
-          if (index === LAST_CHECKPOINT) setSeenLast(true)
+          if (pendingFinale) {
+            setPendingFinale(false)
+            setIndex(FINALE_PAGE)
+          }
         }}
       />
       {started ? (
@@ -159,14 +165,13 @@ export default function App() {
             canTurnBack={backIndex !== null}
             upTarget={upTarget}
             downTarget={downTarget}
-            canAboutFace={!flying && index === LAST_CHECKPOINT && facing === 1}
             onUp={flyForward}
             onDown={() => go(downTarget)}
             onTurnLeft={() => turnBack(1)}
             onTurnRight={() => turnBack(-1)}
             onSelect={go}
           />
-          <AssistOverlay index={index} />
+          <AssistOverlay index={waypoint} />
         </>
       ) : (
         <TitleScreen onStart={startTalk} />

@@ -1,0 +1,22 @@
+---
+description: Do not verify R3F/WebGL visuals in a browser; keep agent loops fast
+alwaysApply: true
+---
+
+# No browser visual verification
+
+The R3F/WebGL scene is CPU-heavy. Do not use a browser to "check" hops or visuals — leave that to the user unless they explicitly ask.
+
+## Do not
+
+- Open, navigate, snapshot, screenshot, or click through the app in a browser (cursor-ide-browser, Playwright, or similar) to verify visuals or hops
+- Start a second Vite/dev server just to eyeball the scene
+
+## Prefer instead
+
+- Typecheck (`tsc`), lint, read code, and reason about params
+- Trust the user's eyes for visual confirmation
+
+## Exception
+
+If the user **explicitly** asks to verify in the browser, then it is OK. Otherwise skip.

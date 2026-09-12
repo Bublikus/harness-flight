@@ -1,4 +1,4 @@
-import { SLIDES } from './slides'
+import { FINALE, FINALE_PAGE, SLIDES } from './slides'
 
 export function Hud({
   index,
@@ -6,7 +6,6 @@ export function Hud({
   canTurnBack,
   upTarget,
   downTarget,
-  canAboutFace,
   onUp,
   onDown,
   onTurnLeft,
@@ -18,13 +17,13 @@ export function Hud({
   canTurnBack: boolean
   upTarget: number
   downTarget: number
-  canAboutFace: boolean
   onUp: () => void
   onDown: () => void
   onTurnLeft: () => void
   onTurnRight: () => void
   onSelect: (i: number) => void
 }) {
+  const finale = index === FINALE_PAGE
   return (
     <div className="hud">
       <header className="topbar chrome">
@@ -33,16 +32,15 @@ export function Hud({
           HARNESS FLIGHT
         </div>
         <div className="clock">
-          {muted ? 'MUTED · ' : ''}WAYPOINT {index + 1}/{SLIDES.length}
+          {muted ? 'MUTED · ' : ''}
+          {finale ? 'FINALE' : `WAYPOINT ${index + 1}/${SLIDES.length}`}
         </div>
       </header>
 
       <div className="hud-bottom chrome">
         <FlightPad
-          upDisabled={
-            (upTarget < 0 || upTarget >= SLIDES.length) && !canAboutFace
-          }
-          downDisabled={downTarget < 0 || downTarget >= SLIDES.length}
+          upDisabled={upTarget < 0 || upTarget > FINALE_PAGE}
+          downDisabled={downTarget < 0 || downTarget > FINALE_PAGE}
           turnDisabled={!canTurnBack}
           onUp={onUp}
           onDown={onDown}
@@ -60,6 +58,14 @@ export function Hud({
               onClick={() => onSelect(i)}
             />
           ))}
+          <button
+            key={FINALE.id}
+            type="button"
+            className={finale ? 'dot sky on' : 'dot sky'}
+            aria-label="Sky finale"
+            aria-current={finale ? 'step' : undefined}
+            onClick={() => onSelect(FINALE_PAGE)}
+          />
         </div>
       </div>
     </div>

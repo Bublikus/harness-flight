@@ -138,6 +138,12 @@ const lastWp = WAYPOINTS[WAYPOINTS.length - 1]
 /** First / last checkpoint poses — terminus hill anchors (ADR-0028). */
 export const ROUTE_START = { x: first.x, z: first.z, yaw: first.yaw }
 export const ROUTE_END = { x: lastWp.x, z: lastWp.z, yaw: lastWp.yaw }
+/** Firework cluster past the end terminus (ADR-0033). */
+export const FINALE_SKY = {
+  x: lastWp.x + Math.sin(lastWp.yaw) * 36,
+  y: lastWp.y + 40,
+  z: lastWp.z + Math.cos(lastWp.yaw) * 36,
+}
 
 function frameAtZ(z: number): { x: number; yaw: number } {
   if (z <= START_Z) return { x: 0, yaw: 0 }

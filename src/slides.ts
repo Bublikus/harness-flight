@@ -156,8 +156,14 @@ export const SLIDES: Slide[] = [
   },
 ]
 
-/** Last talk checkpoint — finale is a second visit here, not a 13th pose. */
+/** Last talk checkpoint — same pose as the extra sky-finale page. */
 export const LAST_CHECKPOINT = SLIDES.length - 1
+/** Extra pagination index after the last slide; not a 13th hop. */
+export const FINALE_PAGE = SLIDES.length
+
+export function waypointIndex(page: number) {
+  return Math.min(page, LAST_CHECKPOINT)
+}
 
 export const FINALE: Slide = {
   id: 'finale',
