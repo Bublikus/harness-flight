@@ -158,6 +158,42 @@ function GearIcon() {
   )
 }
 
+function CameraIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden>
+      <path
+        fill="currentColor"
+        d="M5 3h4l1 2h4a1 1 0 011 1v7a1 1 0 01-1 1H2a1 1 0 01-1-1V6a1 1 0 011-1h2l1-2zm3 4a2.5 2.5 0 100 5 2.5 2.5 0 000-5z"
+      />
+    </svg>
+  )
+}
+
+export function CameraDock({
+  name,
+  onCycle,
+}: {
+  name: string
+  onCycle: () => void
+}) {
+  return (
+    <div className="camera-dock chrome" onPointerUp={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        aria-label={`Camera view: ${name}. Switch camera`}
+        title={`Camera: ${name}`}
+        onClick={onCycle}
+      >
+        <CameraIcon />
+      </button>
+      {/* key remount restarts the flash animation on every switch */}
+      <span key={name} className="camera-dock-label" aria-hidden>
+        {name}
+      </span>
+    </div>
+  )
+}
+
 export function SoundDock({
   muted,
   volume,

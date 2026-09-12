@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AssistOverlay } from './AssistOverlay'
-import { Hud, SettingsDock, SoundDock, TitleScreen } from './Hud'
+import { CameraDock, Hud, SettingsDock, SoundDock, TitleScreen } from './Hud'
+import { activeCameraView, CAMERA_VIEWS, cycleCameraView } from './scene/cameraViews'
 import { World } from './scene/World'
 import type { TurnDirection } from './scene/Flight'
 import {
@@ -38,6 +39,7 @@ export default function App() {
   const [muted, setMuted] = useState(readMuted)
   const [volume, setVol] = useState(readVolume)
   const [motionBlur, setMotionBlur] = useState(readMotionBlur)
+  const [camView, setCamView] = useState(activeCameraView.index)
   const finale = index === FINALE_PAGE
   const waypoint = waypointIndex(index)
   const upTarget = finale ? FINALE_PAGE + 1 : index + facing
@@ -178,6 +180,10 @@ export default function App() {
       )}
       {audioEnabled() && (
         <div className="corner-docks">
+          <CameraDock
+            name={CAMERA_VIEWS[camView].name}
+            onCycle={() => setCamView(cycleCameraView())}
+          />
           <SoundDock
             muted={muted}
             volume={volume}

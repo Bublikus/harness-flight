@@ -11,6 +11,8 @@ import {
 } from './route'
 import { setFlightMix } from './FlightAudio'
 import { planePose } from './worldPoses'
+import { activeCameraView, CAMERA_VIEWS, VIEW_NUMS } from './cameraViews'
+import { terrainHeight } from './Terrain'
 
 export type TurnDirection = -1 | 0 | 1
 
@@ -54,23 +56,22 @@ const TWO_PI = Math.PI * 2
 const ORBIT_YAW = 0.11
 const ORBIT_PITCH_Y = 1
 const ORBIT_LERP = 5
-const CAM_DIST = 12
-const CAM_HEIGHT = 4.8
+/**
+ * Per-view camera knobs (dist/height/follow/fov/…) live in cameraViews.ts;
+ * VIEW_BLEND eases every knob on a switch so cycling isn't a hard cut (~0.5s).
+ */
+const VIEW_BLEND = 4
+/** Camera never sinks below terrain + this clearance (low hero / dip rigs). */
+const CAM_MIN_CLEAR = 1.6
 /** Finale glance: lift look-at over the plane (~15% of the old sky-stare). */
 const FINALE_LOOK_LIFT = 6
 /** Finale settle: drop chase height a little (same skyBlend as the glance). */
 const FINALE_CAM_DIP = 1.6
-/** Base chase catch-up; drops while accelerating so the plane pulls ahead. */
-const CAM_FOLLOW = 4.2
-const CAM_FOLLOW_ACCEL = 1.55
-const ACCEL_PULL = 4.2
 /** Positive Δspeed/dt scaled into 0…1 chase/lens drive. */
 const ACCEL_NORM = 48
 /** accelFeel ease toward rising / falling thrust. */
 const ACCEL_ATTACK = 3
 const ACCEL_DECAY = 3.2
-const BASE_FOV = 58
-const ACCEL_FOV = 8.5
 /** Fisheye onset lags thrust: hopAge gate + slower attack. */
 const LENS_IN = 0.5
 const LENS_OUT = 2.2
@@ -332,6 +333,10 @@ export function Flight({
   const skyBlend = useRef(0)
   const orbitTarget = useRef({ x: 0, y: 0 })
   const orbit = useRef({ x: 0, y: 0 })
+  /** Smoothed copy of the active view's knobs — eased on every switch. */
+  const camCur = useRef({ ...CAMERA_VIEWS[activeCameraView.index] })
+  /** Accumulated drone-orbit azimuth; unwinds when the view has no spin. */
+  const spinPhase = useRef(0)
 
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
@@ -638,22 +643,41 @@ export function Flight({
     const skyAim = finale && !flying ? 1 : 0
     skyBlend.current +=
       (skyAim - skyBlend.current) * (1 - Math.exp(-d * 1.55))
-    const camAz = cameraYaw.current + orbit.current.x * ORBIT_YAW
+
+    const view = CAMERA_VIEWS[activeCameraView.index]
+    const cv = camCur.current
+    const viewEase = 1 - Math.exp(-d * VIEW_BLEND)
+    for (const k of VIEW_NUMS) cv[k] += (view[k] - cv[k]) * viewEase
+    spinPhase.current = wrapPi(spinPhase.current + d * cv.spin)
+    // Leaving the orbit view: unwind leftover phase via the shortest arc.
+    if (view.spin === 0) spinPhase.current -= spinPhase.current * viewEase
+
+    const camAz =
+      cameraYaw.current + orbit.current.x * ORBIT_YAW * cv.orbit + spinPhase.current
     tmp.set(Math.sin(camAz), 0, Math.cos(camAz))
     behind
       .copy(g.position)
-      .addScaledVector(tmp, -(CAM_DIST + thrust * ACCEL_PULL))
+      .addScaledVector(tmp, -(cv.dist + thrust * cv.accelPull))
+    behind.x += Math.cos(camAz) * cv.lateral
+    behind.z -= Math.sin(camAz) * cv.lateral
     behind.y +=
-      CAM_HEIGHT +
-      orbit.current.y * ORBIT_PITCH_Y -
-      skyBlend.current * FINALE_CAM_DIP
-    const follow =
-      CAM_FOLLOW_ACCEL + (CAM_FOLLOW - CAM_FOLLOW_ACCEL) * (1 - thrust)
+      cv.height +
+      orbit.current.y * ORBIT_PITCH_Y * cv.orbit -
+      skyBlend.current * FINALE_CAM_DIP * cv.finale
+    // Low rigs never sink into hills.
+    const camFloor = terrainHeight(behind.x, behind.z) + CAM_MIN_CLEAR
+    if (behind.y < camFloor) behind.y = camFloor
+    // Base chase catch-up; drops while accelerating so the plane pulls ahead.
+    const follow = cv.followAccel + (cv.follow - cv.followAccel) * (1 - thrust)
     state.camera.position.lerp(behind, 1 - Math.exp(-d * follow))
     tmp.set(Math.sin(cameraYaw.current), 0, Math.cos(cameraYaw.current))
-    look.copy(g.position).addScaledVector(tmp, 6)
-    look.y = g.position.y + 1.15 + skyBlend.current * FINALE_LOOK_LIFT
+    look.copy(g.position).addScaledVector(tmp, cv.lookAhead)
+    look.y =
+      g.position.y + cv.lookUp + skyBlend.current * FINALE_LOOK_LIFT * cv.finale
     state.camera.lookAt(look)
+    // Roll with the plane's bank (POV / dolly rigs); lookAt reset it above.
+    if (Math.abs(cv.bankRoll) > 1e-3)
+      state.camera.rotateZ(-g.rotation.z * cv.bankRoll)
 
     const cam = state.camera as THREE.PerspectiveCamera
     // Distortion only: gate + lag behind thrust so FOV eases in after takeoff spool.
@@ -669,7 +693,7 @@ export function Flight({
         Math.exp(
           -d * (lensTarget > lensFeel.current ? LENS_ATTACK : LENS_DECAY),
         ))
-    const fov = BASE_FOV + lensFeel.current * ACCEL_FOV
+    const fov = cv.fov + lensFeel.current * cv.accelFov
     if (Math.abs(cam.fov - fov) > 0.01) {
       cam.fov = fov
       cam.updateProjectionMatrix()

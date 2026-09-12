@@ -273,6 +273,7 @@ button.dot.sky.on {
   gap: 8px;
 }
 
+.camera-dock,
 .sound-dock,
 .settings-dock {
   pointer-events: auto;
@@ -290,6 +291,7 @@ button.dot.sky.on {
   z-index: 1;
 }
 
+.camera-dock > button,
 .sound-dock > button,
 .settings-dock > button {
   width: 44px;
@@ -304,6 +306,33 @@ button.dot.sky.on {
 
 .sound-dock > button.muted {
   background: var(--gold);
+}
+
+/* View name flashes above the camera button on each switch, then fades. */
+.camera-dock-label {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  padding: 6px 8px;
+  border: 3px solid var(--oak-dark);
+  background: linear-gradient(#6a4424, var(--oak-dark));
+  box-shadow: 0 4px 0 #1b140c;
+  color: var(--paper);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7px;
+  letter-spacing: 0.06em;
+  pointer-events: none;
+  opacity: 0;
+  animation: camera-label-flash 1.6s ease forwards;
+}
+
+@keyframes camera-label-flash {
+  0% { opacity: 0; transform: translate(-50%, 6px); }
+  12% { opacity: 1; transform: translate(-50%, 0); }
+  72% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 .sound-dock-pop {
