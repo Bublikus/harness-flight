@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { Plane } from './Plane'
@@ -20,6 +20,10 @@ const DOCK_RADIUS = 0.12
 const DOCK_SPEED = 0.35
 const CAPTURE = 2.4
 const TWO_PI = Math.PI * 2
+/** Chase-cam peek: ~6° yaw, ~1u pitch height, soft follow. */
+const ORBIT_YAW = 0.11
+const ORBIT_PITCH_Y = 1
+const ORBIT_LERP = 5
 
 function wrapPi(a: number) {
   while (a > Math.PI) a -= TWO_PI
@@ -53,6 +57,22 @@ export function Flight({
   const bankZ = useRef(0)
   const pitchX = useRef(0)
   const windPhase = useRef(Math.random() * TWO_PI)
+  const orbitTarget = useRef({ x: 0, y: 0 })
+  const orbit = useRef({ x: 0, y: 0 })
+
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      if (e.pointerType === 'touch') {
+        orbitTarget.current.x = 0
+        orbitTarget.current.y = 0
+        return
+      }
+      orbitTarget.current.x = (e.clientX / window.innerWidth) * 2 - 1
+      orbitTarget.current.y = 1 - (e.clientY / window.innerHeight) * 2
+    }
+    window.addEventListener('pointermove', onMove)
+    return () => window.removeEventListener('pointermove', onMove)
+  }, [])
 
   useFrame((state, dt) => {
     const g = group.current
@@ -189,10 +209,15 @@ export function Flight({
       cameraYaw.current +
         wrapPi(yaw.current - cameraYaw.current) * (1 - Math.exp(-d * 7)),
     )
-    tmp.set(Math.sin(cameraYaw.current), 0, Math.cos(cameraYaw.current))
+    const orbitEase = 1 - Math.exp(-d * ORBIT_LERP)
+    orbit.current.x += (orbitTarget.current.x - orbit.current.x) * orbitEase
+    orbit.current.y += (orbitTarget.current.y - orbit.current.y) * orbitEase
+    const camAz = cameraYaw.current + orbit.current.x * ORBIT_YAW
+    tmp.set(Math.sin(camAz), 0, Math.cos(camAz))
     behind.copy(g.position).addScaledVector(tmp, -12)
-    behind.y += 4.8
+    behind.y += 4.8 + orbit.current.y * ORBIT_PITCH_Y
     state.camera.position.copy(behind)
+    tmp.set(Math.sin(cameraYaw.current), 0, Math.cos(cameraYaw.current))
     look.copy(g.position).addScaledVector(tmp, 6)
     look.y = g.position.y + 1.15
     state.camera.lookAt(look)
