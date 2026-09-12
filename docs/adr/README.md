@@ -37,6 +37,7 @@ Index of lasting presentation choices. Procedure: `adr` skill.
 | [0031](0031-desktop-postprocessing-motion-blur.md) | Desktop EffectComposer motion blur scaled by plane speed | Accepted |
 | [0032](0032-persistent-h-hide-slides.md) | Persistent H-hide across waypoints | Accepted |
 | [0033](0033-sky-finale-after-last-slide.md) | Sky finale after last slide | Accepted |
+| [0034](0034-hermite-arrival-bridge.md) | Hermite arrival bridge | Accepted |
 
 Restore a talk version with `git log --oneline` then `git checkout <commit>`:
 

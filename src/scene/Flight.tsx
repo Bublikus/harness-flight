@@ -28,10 +28,20 @@ const SPEED_RESP_SPOOL = 1.25
 /** Hop age (s) over which speed response ramps spool → full. */
 const SPOOL_IN = 0.2
 const SPOOL_OUT = 1.65
-/** Wall-clock brake: current speed → 0. Integral of the ease is v0*T/2. */
-const BRAKE_T = 0.7
-/** Enter a bit before v0*T/2 so a late frame cannot skip the zone. */
-const BRAKE_PAD = 1.12
+/**
+ * Arrival bridge: time-parameterized cubic Hermite in XZ from the live flight
+ * state to the pad. Duration solves T = 2·chord/(v0 + vEnd) — the time to
+ * cover the chord under a linear v0 → vEnd speed ramp — and entry fires when
+ * that natural T falls to TMAX, so every approach gets the same wall-clock
+ * ease regardless of cruise speed. TMIN keeps a full-feeling ease if a hop
+ * starts already inside the zone.
+ */
+const BRIDGE_TMIN = 0.7
+const BRIDGE_TMAX = 1.4
+/** Rolling finish along parkYaw; < DOCK_SPEED so the dock check passes at u=1. */
+const BRIDGE_VEND = 0.3
+/** Max tangent/chord ratio r = T·v0/chord; r ≤ 3 keeps the profile monotone. */
+const BRIDGE_RMAX = 3
 const YAW_RATE = 3.3
 const LOOKAHEAD = 14
 const SLOWDOWN_RADIUS = 28
@@ -306,9 +316,19 @@ export function Flight({
   const lensFeel = useRef(0)
   const hopAge = useRef(0)
   const hopSpeed = useRef(1)
-  const braking = useRef(false)
-  const brakeFrom = useRef(0)
-  const brakeAge = useRef(0)
+  /** Snapshotted boundary conditions of the arrival bridge (null = cruising). */
+  const bridge = useRef<{
+    t: number
+    T: number
+    p0x: number
+    p0z: number
+    v0x: number
+    v0z: number
+    p1x: number
+    p1z: number
+    v1x: number
+    v1z: number
+  } | null>(null)
   const skyBlend = useRef(0)
   const orbitTarget = useRef({ x: 0, y: 0 })
   const orbit = useRef({ x: 0, y: 0 })
@@ -350,9 +370,7 @@ export function Flight({
       approaching.current = false
       arrived.current = false
       hopAge.current = 0
-      braking.current = false
-      brakeFrom.current = 0
-      brakeAge.current = 0
+      bridge.current = null
       hopSpeed.current = THREE.MathUtils.clamp(
         along / ROUTE_WAVELENGTH,
         HOP_SPEED_MIN,
@@ -375,63 +393,119 @@ export function Flight({
     const horiz = Math.hypot(dx, dz)
     const parkYaw = facing === 1 ? destPose.yaw : destPose.yaw + Math.PI
     // Same-pose about-face: yaw to facing, do not fly a chord.
-    const pivot = flying && horiz < ARRIVAL_RADIUS && along < 6
-    const desired = pivot
-      ? parkYaw
-      : Math.hypot(adx, adz) > 0.05
-        ? Math.atan2(adx, adz)
-        : yaw.current
-    let err = wrapPi(desired - yaw.current)
-    if (turnDirection && Math.abs(err) > Math.PI / 2)
-      err = turnDirection * Math.abs(err)
-    const turning = Math.abs(err) > 0.4
-    const linedUp = Math.abs(err) < 0.15
+    const pivot =
+      flying && bridge.current === null && horiz < ARRIVAL_RADIUS && along < 6
+    const pathHeading =
+      Math.hypot(adx, adz) > 0.05 ? Math.atan2(adx, adz) : yaw.current
 
     if (flying) {
       if (dist > ARRIVAL_RADIUS) {
         arrived.current = false
-      } else if (!approaching.current && linedUp) {
+      } else if (!approaching.current) {
         approaching.current = true
         onApproach()
       }
-
-      const capturing = dist <= ARRIVAL_RADIUS && linedUp
-      const steer = capturing
-        ? THREE.MathUtils.smoothstep(horiz, 0.05, ARRIVAL_RADIUS)
-        : 1
-      const targetYawRate =
-        THREE.MathUtils.clamp(err * 4, -YAW_RATE, YAW_RATE) * steer
-      yawRate.current +=
-        (targetYawRate - yawRate.current) * (1 - Math.exp(-d * 8))
-      yaw.current = wrapPi(
-        yaw.current + yawRate.current * d * (capturing ? 1 / 3 : 1),
-      )
-
-      const aligned = THREE.MathUtils.clamp(Math.cos(err), 0, 1)
-      const turnFactor = turning ? 0.32 + 0.28 * aligned : 0.55 + 0.45 * aligned
+      // Bridge entry: fire ONCE when the natural duration reaches TMAX.
+      // V0 = current velocity, so the curve is C1 with the flight at entry.
       if (
-        !braking.current &&
+        bridge.current === null &&
         !pivot &&
         speed.current > DOCK_SPEED &&
-        along <=
-          Math.max(
-            ARRIVAL_RADIUS,
-            speed.current * BRAKE_T * 0.5 * BRAKE_PAD,
-          )
+        along <= (speed.current + BRIDGE_VEND) * (BRIDGE_TMAX / 2)
       ) {
-        braking.current = true
-        brakeFrom.current = speed.current
-        brakeAge.current = 0
+        const chord = Math.max(horiz, 1e-3)
+        const T = THREE.MathUtils.clamp(
+          (2 * chord) / (speed.current + BRIDGE_VEND),
+          BRIDGE_TMIN,
+          BRIDGE_TMAX,
+        )
+        // Degenerate short-chord entry (hop change near a pad at speed):
+        // clamp V0 influence so the tangent cannot fling the curve past P1.
+        const v0 = Math.min(speed.current, (BRIDGE_RMAX * chord) / T)
+        bridge.current = {
+          t: 0,
+          T,
+          p0x: g.position.x,
+          p0z: g.position.z,
+          v0x: Math.sin(yaw.current) * v0,
+          v0z: Math.cos(yaw.current) * v0,
+          p1x: dest.x,
+          p1z: dest.z,
+          v1x: Math.sin(parkYaw) * BRIDGE_VEND,
+          v1z: Math.cos(parkYaw) * BRIDGE_VEND,
+        }
       }
+    } else {
+      bridge.current = null
+    }
 
-      let brakeU = 0
-      if (braking.current) {
-        brakeAge.current += d
-        brakeU = THREE.MathUtils.clamp(brakeAge.current / BRAKE_T, 0, 1)
-        // Hermite ease-out: (1-u)^2 (1+2u). Stays fast, then rolls off; ∫ = v0 T/2.
-        const rest = 1 - brakeU
-        speed.current = brakeFrom.current * rest * rest * (1 + 2 * brakeU)
+    // Sample the bridge: P(u) = h00·P0 + h10·T·V0 + h01·P1 + h11·T·V1.
+    const b = flying ? bridge.current : null
+    let bridgeU = 0
+    let bpx = 0
+    let bpz = 0
+    let bvx = 0
+    let bvz = 0
+    if (b) {
+      b.t += d
+      // u strictly time-based (never speed-fed back), so it cannot stall.
+      bridgeU = Math.min(b.t / b.T, 1)
+      const u = bridgeU
+      const u2 = u * u
+      const u3 = u2 * u
+      const h00 = 2 * u3 - 3 * u2 + 1
+      const h10 = u3 - 2 * u2 + u
+      const h01 = 3 * u2 - 2 * u3
+      const h11 = u3 - u2
+      bpx = h00 * b.p0x + h10 * b.T * b.v0x + h01 * b.p1x + h11 * b.T * b.v1x
+      bpz = h00 * b.p0z + h10 * b.T * b.v0z + h01 * b.p1z + h11 * b.T * b.v1z
+      // dP/dt = P'(u)/T — real velocity along the curve.
+      const g00 = 6 * u2 - 6 * u
+      const g10 = 3 * u2 - 4 * u + 1
+      const g01 = 6 * u - 6 * u2
+      const g11 = 3 * u2 - 2 * u
+      bvx =
+        (g00 * b.p0x + g10 * b.T * b.v0x + g01 * b.p1x + g11 * b.T * b.v1x) /
+        b.T
+      bvz =
+        (g00 * b.p0z + g10 * b.T * b.v0z + g01 * b.p1z + g11 * b.T * b.v1z) /
+        b.T
+    }
+
+    // Curve tangent (path-ahead when cruising) → park facing over the late
+    // bridge / last ~10u. Shortest arc via wrapPi; no step at capture.
+    const parkAim = !flying
+      ? 1
+      : Math.max(
+          1 - THREE.MathUtils.smoothstep(horiz, ARRIVAL_RADIUS, 10),
+          THREE.MathUtils.smoothstep(bridgeU, 0.6, 1),
+        )
+    const baseHeading = b
+      ? Math.hypot(bvx, bvz) > 0.05
+        ? Math.atan2(bvx, bvz)
+        : parkYaw
+      : pathHeading
+    const desired = wrapPi(
+      baseHeading + wrapPi(parkYaw - baseHeading) * parkAim,
+    )
+    let err = wrapPi(desired - yaw.current)
+    if (turnDirection && parkAim < 0.35 && Math.abs(err) > Math.PI / 2)
+      err = turnDirection * Math.abs(err)
+    const turning = Math.abs(err) > 0.4
+    const facingPark = Math.abs(wrapPi(parkYaw - yaw.current)) < 0.15
+
+    const targetYawRate = THREE.MathUtils.clamp(err * 4, -YAW_RATE, YAW_RATE)
+    yawRate.current +=
+      (targetYawRate - yawRate.current) * (1 - Math.exp(-d * 8))
+    yaw.current = wrapPi(yaw.current + yawRate.current * d)
+
+    if (flying) {
+      if (b) {
+        // Speed is |P'(t)| so audio/motes/camera follow the real motion.
+        speed.current = Math.hypot(bvx, bvz)
       } else {
+        const aligned = THREE.MathUtils.clamp(Math.cos(err), 0, 1)
+        const turnFactor = turning ? 0.32 + 0.28 * aligned : 0.55 + 0.45 * aligned
         const targetSpeed = pivot ? 0 : CRUISE * hopSpeed.current * turnFactor
         const spool = THREE.MathUtils.smoothstep(
           hopAge.current,
@@ -443,42 +517,47 @@ export function Flight({
         speed.current +=
           (targetSpeed - speed.current) * (1 - Math.exp(-d * speedResp))
       }
+    } else {
+      speed.current += (0 - speed.current) * (1 - Math.exp(-d * 5))
+    }
 
-      if (pivot) {
-        g.position.lerp(dest, 1 - Math.exp(-d * CAPTURE))
-      } else {
-        g.position.x += Math.sin(yaw.current) * speed.current * d
-        g.position.z += Math.cos(yaw.current) * speed.current * d
-        g.position.y += (dest.y - g.position.y) * (1 - Math.exp(-d * 1.5))
-        // Skip capture lerp during the 0.7s roll-in; it was the slam.
-        if (dist > 1e-5 && !(braking.current && brakeU < 1)) {
-          const fade = capturing
-            ? THREE.MathUtils.smoothstep(
-                ARRIVAL_RADIUS - dist,
-                0,
-                ARRIVAL_RADIUS,
-              )
-            : braking.current
-              ? 1
-              : 0
-          if (fade > 0) {
-            g.position.lerp(dest, 1 - Math.exp(-d * CAPTURE * fade))
-          }
-        }
-      }
+    if (b) {
+      // The curve owns position; at u=1 it lands on the pad exactly, so no
+      // capture lerp fights it.
+      g.position.x = bpx
+      g.position.z = bpz
+    } else if (!pivot) {
+      g.position.x += Math.sin(yaw.current) * speed.current * d
+      g.position.z += Math.cos(yaw.current) * speed.current * d
+    }
+    const springK = b ? 0 : CAPTURE * (pivot || !flying ? 1 : parkAim)
+    if (springK > 1e-5) {
+      const u = 1 - Math.exp(-d * springK)
+      g.position.x += (dest.x - g.position.x) * u
+      g.position.z += (dest.z - g.position.z) * u
+    }
+    const parkedFor = state.clock.elapsedTime - parkedAt.current
+    const bob = !flying
+      ? Math.sin(parkedFor * 2.2) *
+        0.12 *
+        THREE.MathUtils.smoothstep(parkedFor, 0, 0.8)
+      : 0
+    g.position.y +=
+      (dest.y + bob - g.position.y) * (1 - Math.exp(-d * (flying ? 1.5 : 5)))
+    g.rotation.y = yaw.current
 
-      g.rotation.y = yaw.current
+    if (flying) {
       const rateBank = (-yawRate.current / YAW_RATE) * 0.68
       const pathBank = THREE.MathUtils.clamp(-near.kappa * alongDir * 6, -0.42, 0.42)
-      const bank = (rateBank + pathBank) * (capturing ? 0.5 : 1)
-      const pitch = (turning ? 0.16 : 0.07) * (capturing ? steer : 1)
+      const bank = (rateBank + pathBank) * (1 - 0.5 * parkAim)
+      const pitch = (turning ? 0.16 : 0.07) * (1 - 0.5 * parkAim)
       bankZ.current += (bank - bankZ.current) * (1 - Math.exp(-d * 6))
       pitchX.current += (pitch - pitchX.current) * (1 - Math.exp(-d * 5))
 
       if (
         g.position.distanceTo(dest) < DOCK_RADIUS &&
         speed.current < DOCK_SPEED &&
-        linedUp &&
+        facingPark &&
         !arrived.current
       ) {
         arrived.current = true
@@ -486,18 +565,6 @@ export function Flight({
         onArrived()
       }
     } else {
-      yawRate.current += (0 - yawRate.current) * (1 - Math.exp(-d * 6))
-      speed.current += (0 - speed.current) * (1 - Math.exp(-d * 5))
-      const parkedFor = state.clock.elapsedTime - parkedAt.current
-      const bob =
-        Math.sin(parkedFor * 2.2) *
-        0.12 *
-        THREE.MathUtils.smoothstep(parkedFor, 0, 0.8)
-      const settle = 1 - Math.exp(-d * 5)
-      g.position.x += (dest.x - g.position.x) * settle
-      g.position.z += (dest.z - g.position.z) * settle
-      g.position.y += (dest.y + bob - g.position.y) * settle
-      g.rotation.y = yaw.current
       bankZ.current += (0 - bankZ.current) * (1 - Math.exp(-d * 3))
       pitchX.current += (0 - pitchX.current) * (1 - Math.exp(-d * 3))
     }
