@@ -3,7 +3,7 @@
 const MUTE_KEY = 'harness-flight-mute'
 const VOLUME_KEY = 'harness-flight-volume'
 /** Max master gain at volume=1. ~0.85 keeps a little headroom for stacked fireworks. */
-const MASTER = 0.85
+const MASTER = 1.0
 
 import { isMobileWorld } from './device'
 
