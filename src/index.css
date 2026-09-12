@@ -269,33 +269,63 @@ button.dot.sky.on {
   bottom: 16px;
   z-index: 2;
   display: flex;
+  flex-direction: column-reverse;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px 6px 6px;
-  border: 3px solid var(--oak-dark);
-  background: linear-gradient(#6a4424, var(--oak-dark));
-  box-shadow: 0 4px 0 #1b140c;
+  gap: 6px;
 }
 
 .sound-dock button {
-  padding: 8px 7px;
-  font-size: 7px;
-  min-width: 54px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
   background: var(--paper);
+  color: var(--ink);
 }
 
 .sound-dock button.muted {
   background: var(--gold);
 }
 
+.sound-dock-pop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 8px;
+  border: 3px solid var(--oak-dark);
+  background: linear-gradient(#6a4424, var(--oak-dark));
+  box-shadow: 0 4px 0 #1b140c;
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+  transition:
+    opacity 0.14s ease,
+    transform 0.14s ease;
+}
+
+.sound-dock:hover .sound-dock-pop {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
 .sound-dock input[type='range'] {
-  width: 88px;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 22px;
+  height: 88px;
+  margin: 0;
   accent-color: var(--gold);
   cursor: pointer;
 }
 
+/* Touch / no-hover: keep the vertical slider reachable without hover-reveal. */
 @media (hover: none), (pointer: coarse) {
-  .sound-dock {
-    display: none;
+  .sound-dock-pop {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
   }
 }

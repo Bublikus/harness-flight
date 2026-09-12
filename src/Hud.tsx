@@ -131,6 +131,22 @@ function FlightPad({
   )
 }
 
+function SpeakerIcon({ off }: { off: boolean }) {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden>
+      <path fill="currentColor" d="M1 6h3l4-3v10l-4-3H1V6z" />
+      {off ? (
+        <g fill="currentColor" transform="translate(12 8)">
+          <rect x="-1" y="-5" width="2" height="10" transform="rotate(45)" />
+          <rect x="-1" y="-5" width="2" height="10" transform="rotate(-45)" />
+        </g>
+      ) : (
+        <path fill="currentColor" d="M10 7h1v2h-1zm2-2h1v6h-1zm2-2h1v10h-1z" />
+      )}
+    </svg>
+  )
+}
+
 export function SoundDock({
   muted,
   volume,
@@ -142,26 +158,30 @@ export function SoundDock({
   onMute: () => void
   onVolume: (volume: number) => void
 }) {
+  const silent = muted || volume === 0
   return (
     <div className="sound-dock chrome" onPointerUp={(e) => e.stopPropagation()}>
       <button
         type="button"
-        className={muted ? 'muted' : undefined}
+        className={silent ? 'muted' : undefined}
         aria-pressed={muted}
         aria-label={muted ? 'Unmute' : 'Mute'}
         onClick={onMute}
       >
-        {muted ? 'MUTED' : 'MUTE'}
+        <SpeakerIcon off={silent} />
       </button>
-      <input
-        type="range"
-        min={0}
-        max={1}
-        step={0.01}
-        value={volume}
-        aria-label="Volume"
-        onChange={(e) => onVolume(Number(e.target.value))}
-      />
+      <div className="sound-dock-pop">
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.01}
+          value={volume}
+          aria-label="Volume"
+          aria-orientation="vertical"
+          onChange={(e) => onVolume(Number(e.target.value))}
+        />
+      </div>
     </div>
   )
 }
