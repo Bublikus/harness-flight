@@ -1,10 +1,11 @@
 import { useMemo, useRef } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { Terrain } from './Terrain'
 import { Beacons } from './Beacons'
 import { Birds } from './Birds'
+import { isMobileWorld } from './device'
 import { Flight, type TurnDirection } from './Flight'
+import { Terrain } from './Terrain'
 import { WorldSlide } from './WorldSlide'
 import { planePose } from './worldPoses'
 
@@ -17,7 +18,7 @@ const SUN_DIST = 55
 const SHADOW_EXTENT = 36
 
 /** Soft Minecraft sky: color by view elevation only — no cube-face seams. */
-function SoftSky() {
+function SoftSky({ mobile }: { mobile: boolean }) {
   const mesh = useRef<THREE.Mesh>(null)
   const material = useMemo(
     () =>
@@ -61,15 +62,16 @@ function SoftSky() {
 
   return (
     <mesh ref={mesh} scale={80} material={material} frustumCulled={false}>
-      <sphereGeometry args={[1, 32, 16]} />
+      <sphereGeometry args={[1, mobile ? 16 : 32, mobile ? 8 : 16]} />
     </mesh>
   )
 }
 
-function SunLight() {
+function SunLight({ mobile }: { mobile: boolean }) {
   const light = useRef<THREE.DirectionalLight>(null)
   const target = useRef<THREE.Object3D>(null)
   const follow = useRef(new THREE.Vector3())
+  const map = mobile ? 1024 : 2048
 
   useFrame(() => {
     const l = light.current
@@ -91,10 +93,10 @@ function SunLight() {
         castShadow
         intensity={1.55}
         position={[-34, 52, -38]}
-        shadow-mapSize={[2048, 2048]}
+        shadow-mapSize={[map, map]}
         shadow-bias={-0.0003}
         shadow-normalBias={0.025}
-        shadow-radius={2}
+        shadow-radius={mobile ? 1 : 2}
         shadow-camera-near={1}
         shadow-camera-far={130}
         shadow-camera-left={-SHADOW_EXTENT}
@@ -131,18 +133,19 @@ export function World({
   onApproach: () => void
   onArrived: () => void
 }) {
+  const mobile = isMobileWorld()
   return (
     <Canvas
-      shadows="soft"
+      shadows={mobile ? true : 'soft'}
       camera={{ fov: 58, near: 0.1, far: 320, position: [0, 14.2, -8] }}
-      dpr={[1, 1.5]}
+      dpr={mobile ? [1, 1] : [1, 1.5]}
       onCreated={({ camera }) => camera.lookAt(0, 11.5, 8)}
     >
       <color attach="background" args={['#f3e0c4']} />
       <fog attach="fog" args={['#6aa8d8', 75, 190]} />
       <hemisphereLight args={['#c8e8ff', '#6a8a4a', 0.95]} />
-      <SunLight />
-      <SoftSky />
+      <SunLight mobile={mobile} />
+      <SoftSky mobile={mobile} />
       <Terrain />
       <Birds />
       <Beacons current={index} />

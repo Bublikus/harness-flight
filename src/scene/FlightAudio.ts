@@ -4,9 +4,11 @@ const MUTE_KEY = 'harness-flight-mute'
 const VOLUME_KEY = 'harness-flight-volume'
 const MASTER = 0.18
 
+import { isMobileWorld } from './device'
+
 /** Match HUD mobile media: no AudioContext / SFX on touch / coarse pointers. */
 export function audioEnabled() {
-  return !window.matchMedia('(hover: none), (pointer: coarse)').matches
+  return !isMobileWorld()
 }
 
 let ctx: AudioContext | null = null

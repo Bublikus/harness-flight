@@ -1,6 +1,8 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { blockMaterials } from './blockTextures'
+import { isMobileWorld } from './device'
 import {
   pathLateral,
   pathX,
@@ -11,6 +13,13 @@ import {
   ROUTE_Z_MAX,
   ROUTE_Z_MIN,
 } from './route'
+import { planePose } from './worldPoses'
+
+/** Z-span per streamed strip — mobile only; density stays 1×1 full fill. */
+const CHUNK_Z = 48
+/** Loaded strips on each side of the plane (fog far ≈ 190). */
+const CHUNK_KEEP = 2
+const CHUNK_COUNT = Math.ceil((ROUTE_Z_MAX - ROUTE_Z_MIN) / CHUNK_Z)
 
 function n2(x: number, z: number) {
   return Math.abs(Math.sin(x * 12.9898 + z * 78.233) * 43758.5453) % 1
@@ -103,8 +112,8 @@ function bucket(id: string, scale?: [number, number, number]): Bucket {
   return { id, pos: [], scale }
 }
 
-function build(): Bucket[] {
-  const B = {
+function emptyBuckets(): Record<string, Bucket> {
+  return {
     grass: bucket('grass'),
     dirt: bucket('dirt'),
     stone: bucket('stone'),
@@ -130,6 +139,11 @@ function build(): Bucket[] {
     wool: bucket('wool', [0.7, 0.55, 0.9]),
     cloud: bucket('cloud'),
   }
+}
+
+/** Full-density columns for z ∈ [z0, z1). Same recipe as desktop — no grid/crust LOD. */
+function buildRange(z0: number, z1: number): Bucket[] {
+  const B = emptyBuckets()
 
   const push = (b: Bucket, x: number, y: number, z: number) => {
     b.pos.push(x, y, z)
@@ -175,7 +189,7 @@ function build(): Bucket[] {
     }
   }
 
-  for (let z = ROUTE_Z_MIN; z < ROUTE_Z_MAX; z++) {
+  for (let z = z0; z < z1; z++) {
     for (let x = ROUTE_X_MIN; x <= ROUTE_X_MAX; x++) {
       const r = n2(x, z)
       const lat = pathLateral(x, z)
@@ -223,6 +237,11 @@ function build(): Bucket[] {
     }
   }
 
+  return Object.values(B)
+}
+
+function buildClouds(): Bucket {
+  const cloud = bucket('cloud')
   for (let i = 0; i < 28; i++) {
     const cz = 20 + i * 28 + n2(i, 2) * 10
     const cx = pathX(cz) + (n2(i, 9) - 0.5) * 50
@@ -232,16 +251,35 @@ function build(): Bucket[] {
       for (let y = 0; y <= 1; y++) {
         for (let z = -s; z <= s; z++) {
           if (Math.abs(x) + Math.abs(z) > s + 1) continue
-          push(B.cloud, cx + x, cy + y, cz + z)
+          cloud.pos.push(cx + x, cy + y, cz + z)
         }
       }
     }
   }
-
-  return Object.values(B)
+  return cloud
 }
 
-function Instanced({ data }: { data: Bucket }) {
+function buildFull(): Bucket[] {
+  const ground = buildRange(ROUTE_Z_MIN, ROUTE_Z_MAX)
+  const clouds = buildClouds()
+  const cloudBucket = ground.find((b) => b.id === 'cloud')!
+  cloudBucket.pos = clouds.pos
+  return ground
+}
+
+function chunkZ0(i: number) {
+  return ROUTE_Z_MIN + i * CHUNK_Z
+}
+
+function buildChunk(i: number) {
+  return buildRange(chunkZ0(i), Math.min(ROUTE_Z_MAX, chunkZ0(i) + CHUNK_Z))
+}
+
+function centerChunk(z: number) {
+  return Math.max(0, Math.min(CHUNK_COUNT - 1, Math.floor((z - ROUTE_Z_MIN) / CHUNK_Z)))
+}
+
+function Instanced({ data, cull }: { data: Bucket; cull: boolean }) {
   const mesh = useMemo(() => {
     const [sx, sy, sz] = data.scale ?? [1, 1, 1]
     const geo = new THREE.BoxGeometry(sx, sy, sz)
@@ -261,20 +299,93 @@ function Instanced({ data }: { data: Bucket }) {
       m.setColorAt(i / 3, tint)
     }
     if (m.instanceColor) m.instanceColor.needsUpdate = true
-    m.frustumCulled = false
+    m.computeBoundingSphere()
+    // Desktop keeps everything drawn (chase cam looks back); mobile culls for fill rate.
+    m.frustumCulled = cull
     m.receiveShadow = true
     // Ground / canopy take bird shadows; skip casting (thousands of instances).
     return m
-  }, [data])
+  }, [data, cull])
+
+  useEffect(
+    () => () => {
+      // Shared blockMaterials cache — dispose geometry only.
+      mesh.geometry.dispose()
+    },
+    [mesh],
+  )
 
   return <primitive object={mesh} />
 }
 
-export function Terrain() {
-  const world = useMemo(build, [])
+function BucketMeshes({ buckets, cull }: { buckets: Bucket[]; cull: boolean }) {
+  return (
+    <>
+      {buckets.map((b) =>
+        b.pos.length ? <Instanced key={b.id} data={b} cull={cull} /> : null,
+      )}
+    </>
+  )
+}
+
+function TerrainFull() {
+  const world = useMemo(buildFull, [])
   return (
     <group>
-      {world.map((b) => (b.pos.length ? <Instanced key={b.id} data={b} /> : null))}
+      <BucketMeshes buckets={world} cull={false} />
     </group>
   )
+}
+
+/** Full-density strips around the plane — load/unload along Z, one chunk per frame. */
+function TerrainStreamed() {
+  const clouds = useMemo(buildClouds, [])
+  const cache = useRef(new Map<number, Bucket[]>())
+  const [ids, setIds] = useState<number[]>(() => {
+    const c = centerChunk(ROUTE_START.z)
+    const init: number[] = []
+    for (let i = c - CHUNK_KEEP; i <= c + CHUNK_KEEP; i++) {
+      if (i < 0 || i >= CHUNK_COUNT) continue
+      cache.current.set(i, buildChunk(i))
+      init.push(i)
+    }
+    return init
+  })
+
+  useFrame(() => {
+    const z = planePose.valid ? planePose.pos.z : ROUTE_START.z
+    const c = centerChunk(z)
+    const want = new Set<number>()
+    for (let i = c - CHUNK_KEEP; i <= c + CHUNK_KEEP; i++) {
+      if (i >= 0 && i < CHUNK_COUNT) want.add(i)
+    }
+
+    let changed = false
+    for (const i of cache.current.keys()) {
+      if (!want.has(i)) {
+        cache.current.delete(i)
+        changed = true
+      }
+    }
+    for (const i of want) {
+      if (cache.current.has(i)) continue
+      cache.current.set(i, buildChunk(i))
+      changed = true
+      break
+    }
+    if (changed) setIds([...cache.current.keys()].sort((a, b) => a - b))
+  })
+
+  return (
+    <group>
+      {ids.map((i) => (
+        <BucketMeshes key={i} buckets={cache.current.get(i)!} cull />
+      ))}
+      {clouds.pos.length ? <Instanced data={clouds} cull /> : null}
+    </group>
+  )
+}
+
+export function Terrain() {
+  return isMobileWorld() ? <TerrainStreamed /> : <TerrainFull />
 }

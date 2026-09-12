@@ -32,6 +32,8 @@ Index of lasting presentation choices. Procedure: `adr` skill.
 | [0026](0026-path-following-hops.md) | Irregular route; hops follow the polyline | Accepted |
 | [0027](0027-last-checkpoint-finale-return.md) | Last-checkpoint about-face; finale on return | Accepted |
 | [0028](0028-terminus-mountain-framing.md) | Terminus mountain framing at start/end | Accepted |
+| [0029](0029-mobile-world-lod.md) | Mobile world LOD (coarser terrain + lighter shadows) | Superseded by ADR-0030 |
+| [0030](0030-full-world-mobile-runtime-opts.md) | Full world with mobile runtime opts (chunk stream + cheaper GPU) | Accepted |
 
 Restore a talk version with `git log --oneline` then `git checkout <commit>`:
 
