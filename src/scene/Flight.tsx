@@ -12,7 +12,13 @@ const tmp = new THREE.Vector3()
 const look = new THREE.Vector3()
 const behind = new THREE.Vector3()
 const dest = new THREE.Vector3()
-const CRUISE = 26
+const CRUISE = 28
+/** Mid-hop speed ease; takeoff uses SPEED_RESP_SPOOL then blends up. */
+const SPEED_RESP = 4.2
+const SPEED_RESP_SPOOL = 1.25
+/** Hop age (s) over which speed response ramps spool → full. */
+const SPOOL_IN = 0.2
+const SPOOL_OUT = 1.65
 const YAW_RATE = 3.3
 const LOOKAHEAD = 14
 const SLOWDOWN_RADIUS = 28
@@ -25,6 +31,24 @@ const TWO_PI = Math.PI * 2
 const ORBIT_YAW = 0.11
 const ORBIT_PITCH_Y = 1
 const ORBIT_LERP = 5
+const CAM_DIST = 12
+const CAM_HEIGHT = 4.8
+/** Base chase catch-up; drops while accelerating so the plane pulls ahead. */
+const CAM_FOLLOW = 4.2
+const CAM_FOLLOW_ACCEL = 1.55
+const ACCEL_PULL = 4.2
+/** Positive Δspeed/dt scaled into 0…1 chase/lens drive. */
+const ACCEL_NORM = 48
+/** accelFeel ease toward rising / falling thrust. */
+const ACCEL_ATTACK = 3
+const ACCEL_DECAY = 3.2
+const BASE_FOV = 58
+const ACCEL_FOV = 8.5
+/** Fisheye onset lags thrust: hopAge gate + slower attack. */
+const LENS_IN = 0.5
+const LENS_OUT = 2.2
+const LENS_ATTACK = 1.35
+const LENS_DECAY = 3.5
 
 function wrapPi(a: number) {
   while (a > Math.PI) a -= TWO_PI
@@ -258,6 +282,10 @@ export function Flight({
   const pitchX = useRef(0)
   const windPhase = useRef(Math.random() * TWO_PI)
   const windVis = useRef(0)
+  const prevSpeed = useRef(0)
+  const accelFeel = useRef(0)
+  const lensFeel = useRef(0)
+  const hopAge = useRef(0)
   const orbitTarget = useRef({ x: 0, y: 0 })
   const orbit = useRef({ x: 0, y: 0 })
 
@@ -289,8 +317,11 @@ export function Flight({
       lastTurnDirection.current = turnDirection
       approaching.current = false
       arrived.current = false
+      hopAge.current = 0
     }
     wasFlying.current = flying
+    if (flying) hopAge.current += d
+    else hopAge.current = 0
 
     const destPose = waypointPose(index)
     dest.set(destPose.x, destPose.y, destPose.z)
@@ -353,7 +384,11 @@ export function Flight({
       const targetSpeed = pivot
         ? 0
         : CRUISE * turnFactor * (capturing ? approach : cruise)
-      speed.current += (targetSpeed - speed.current) * (1 - Math.exp(-d * 3.2))
+      const spool = THREE.MathUtils.smoothstep(hopAge.current, SPOOL_IN, SPOOL_OUT)
+      const speedResp =
+        SPEED_RESP_SPOOL + (SPEED_RESP - SPEED_RESP_SPOOL) * spool
+      speed.current +=
+        (targetSpeed - speed.current) * (1 - Math.exp(-d * speedResp))
 
       if (pivot) {
         g.position.lerp(dest, 1 - Math.exp(-d * CAPTURE))
@@ -448,22 +483,62 @@ export function Flight({
     planePose.pos.copy(g.position)
     planePose.valid = true
 
+    // Positive speed ramp drives chase lag + fisheye FOV; decays when cruising/landing.
+    const rawAccel = Math.max(
+      0,
+      (speed.current - prevSpeed.current) / Math.max(d, 1e-4),
+    )
+    prevSpeed.current = speed.current
+    const accelTarget = THREE.MathUtils.clamp(rawAccel / ACCEL_NORM, 0, 1)
+    accelFeel.current +=
+      (accelTarget - accelFeel.current) *
+      (1 -
+        Math.exp(
+          -d * (accelTarget > accelFeel.current ? ACCEL_ATTACK : ACCEL_DECAY),
+        ))
+    const thrust = accelFeel.current
+
     cameraYaw.current = wrapPi(
       cameraYaw.current +
-        wrapPi(yaw.current - cameraYaw.current) * (1 - Math.exp(-d * 7)),
+        wrapPi(yaw.current - cameraYaw.current) *
+          (1 - Math.exp(-d * (7 - 2.2 * thrust))),
     )
     const orbitEase = 1 - Math.exp(-d * ORBIT_LERP)
     orbit.current.x += (orbitTarget.current.x - orbit.current.x) * orbitEase
     orbit.current.y += (orbitTarget.current.y - orbit.current.y) * orbitEase
     const camAz = cameraYaw.current + orbit.current.x * ORBIT_YAW
     tmp.set(Math.sin(camAz), 0, Math.cos(camAz))
-    behind.copy(g.position).addScaledVector(tmp, -12)
-    behind.y += 4.8 + orbit.current.y * ORBIT_PITCH_Y
-    state.camera.position.copy(behind)
+    behind
+      .copy(g.position)
+      .addScaledVector(tmp, -(CAM_DIST + thrust * ACCEL_PULL))
+    behind.y += CAM_HEIGHT + orbit.current.y * ORBIT_PITCH_Y
+    const follow =
+      CAM_FOLLOW_ACCEL + (CAM_FOLLOW - CAM_FOLLOW_ACCEL) * (1 - thrust)
+    state.camera.position.lerp(behind, 1 - Math.exp(-d * follow))
     tmp.set(Math.sin(cameraYaw.current), 0, Math.cos(cameraYaw.current))
     look.copy(g.position).addScaledVector(tmp, 6)
     look.y = g.position.y + 1.15
     state.camera.lookAt(look)
+
+    const cam = state.camera as THREE.PerspectiveCamera
+    // Distortion only: gate + lag behind thrust so FOV eases in after takeoff spool.
+    const lensGate = THREE.MathUtils.smoothstep(
+      hopAge.current,
+      LENS_IN,
+      LENS_OUT,
+    )
+    const lensTarget = thrust * lensGate
+    lensFeel.current +=
+      (lensTarget - lensFeel.current) *
+      (1 -
+        Math.exp(
+          -d * (lensTarget > lensFeel.current ? LENS_ATTACK : LENS_DECAY),
+        ))
+    const fov = BASE_FOV + lensFeel.current * ACCEL_FOV
+    if (Math.abs(cam.fov - fov) > 0.01) {
+      cam.fov = fov
+      cam.updateProjectionMatrix()
+    }
   })
 
   return (
