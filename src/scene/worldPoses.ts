@@ -3,6 +3,8 @@ import * as THREE from 'three'
 /** Module poses updated each frame — birds read without React coupling. */
 export const planePose = {
   pos: new THREE.Vector3(),
+  /** World units/s; desktop motion blur scales from this. */
+  speed: 0,
   valid: false,
 }
 

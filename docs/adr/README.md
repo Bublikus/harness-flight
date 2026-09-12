@@ -34,6 +34,7 @@ Index of lasting presentation choices. Procedure: `adr` skill.
 | [0028](0028-terminus-mountain-framing.md) | Terminus mountain framing at start/end | Accepted |
 | [0029](0029-mobile-world-lod.md) | Mobile world LOD (coarser terrain + lighter shadows) | Superseded by ADR-0030 |
 | [0030](0030-full-world-mobile-runtime-opts.md) | Full world with mobile runtime opts (chunk stream + cheaper GPU) | Accepted |
+| [0031](0031-desktop-postprocessing-motion-blur.md) | Desktop EffectComposer motion blur scaled by plane speed | Accepted |
 
 Restore a talk version with `git log --oneline` then `git checkout <commit>`:
 

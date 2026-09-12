@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { lazy, Suspense, useMemo, useRef } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { Beacons } from './Beacons'
@@ -8,6 +8,10 @@ import { Flight, type TurnDirection } from './Flight'
 import { Terrain } from './Terrain'
 import { WorldSlide } from './WorldSlide'
 import { planePose } from './worldPoses'
+
+const SpeedMotionBlur = lazy(() =>
+  import('./SpeedMotionBlur').then((m) => ({ default: m.SpeedMotionBlur })),
+)
 
 /**
  * Audience-side sun: board faces the plane/camera (−Z at takeoff), so the light
@@ -166,6 +170,12 @@ export function World({
         onApproach={onApproach}
         onArrived={onArrived}
       />
+      {/* Desktop only — EffectComposer never mounts (or loads) on mobile. */}
+      {!mobile && (
+        <Suspense fallback={null}>
+          <SpeedMotionBlur />
+        </Suspense>
+      )}
     </Canvas>
   )
 }
