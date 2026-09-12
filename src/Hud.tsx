@@ -6,6 +6,7 @@ export function Hud({
   canTurnBack,
   upTarget,
   downTarget,
+  canAboutFace,
   onUp,
   onDown,
   onTurnLeft,
@@ -16,6 +17,7 @@ export function Hud({
   canTurnBack: boolean
   upTarget: number
   downTarget: number
+  canAboutFace: boolean
   onUp: () => void
   onDown: () => void
   onTurnLeft: () => void
@@ -35,7 +37,9 @@ export function Hud({
 
       <div className="hud-bottom chrome">
         <FlightPad
-          upDisabled={upTarget < 0 || upTarget >= SLIDES.length}
+          upDisabled={
+            (upTarget < 0 || upTarget >= SLIDES.length) && !canAboutFace
+          }
           downDisabled={downTarget < 0 || downTarget >= SLIDES.length}
           turnDisabled={!canTurnBack}
           onUp={onUp}

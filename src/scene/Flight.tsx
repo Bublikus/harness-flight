@@ -230,12 +230,14 @@ function WindMotes({
 export function Flight({
   index,
   flying,
+  facing,
   turnDirection,
   onApproach,
   onArrived,
 }: {
   index: number
   flying: boolean
+  facing: 1 | -1
   turnDirection: TurnDirection
   onApproach: () => void
   onArrived: () => void
@@ -245,6 +247,7 @@ export function Flight({
   const arrived = useRef(false)
   const lastIndex = useRef(index)
   const lastTurnDirection = useRef(turnDirection)
+  const wasFlying = useRef(flying)
   const yaw = useRef(0)
   const pathS = useRef(0)
   const cameraYaw = useRef(0)
@@ -279,13 +282,15 @@ export function Flight({
 
     if (
       lastIndex.current !== index ||
-      lastTurnDirection.current !== turnDirection
+      lastTurnDirection.current !== turnDirection ||
+      (flying && !wasFlying.current)
     ) {
       lastIndex.current = index
       lastTurnDirection.current = turnDirection
       approaching.current = false
       arrived.current = false
     }
+    wasFlying.current = flying
 
     const destPose = waypointPose(index)
     dest.set(destPose.x, destPose.y, destPose.z)
@@ -305,24 +310,32 @@ export function Flight({
     const dz = dest.z - g.position.z
     const dist = Math.hypot(dx, dz, dest.y - g.position.y)
     const horiz = Math.hypot(dx, dz)
-    const desired =
-      Math.hypot(adx, adz) > 0.05 ? Math.atan2(adx, adz) : yaw.current
+    const parkYaw = facing === 1 ? destPose.yaw : destPose.yaw + Math.PI
+    // Same-pose about-face: yaw to facing, do not fly a chord.
+    const pivot = flying && horiz < ARRIVAL_RADIUS && along < 6
+    const desired = pivot
+      ? parkYaw
+      : Math.hypot(adx, adz) > 0.05
+        ? Math.atan2(adx, adz)
+        : yaw.current
     let err = wrapPi(desired - yaw.current)
     if (turnDirection && Math.abs(err) > Math.PI / 2)
       err = turnDirection * Math.abs(err)
     const turning = Math.abs(err) > 0.4
+    const linedUp = Math.abs(err) < 0.15
 
     if (flying) {
       if (dist > ARRIVAL_RADIUS) {
         arrived.current = false
-      } else if (!approaching.current) {
+      } else if (!approaching.current && linedUp) {
         approaching.current = true
         onApproach()
       }
 
-      const capturing = dist <= ARRIVAL_RADIUS
-      const steer =
-        capturing ? THREE.MathUtils.smoothstep(horiz, 0.05, ARRIVAL_RADIUS) : 1
+      const capturing = dist <= ARRIVAL_RADIUS && linedUp
+      const steer = capturing
+        ? THREE.MathUtils.smoothstep(horiz, 0.05, ARRIVAL_RADIUS)
+        : 1
       const targetYawRate =
         THREE.MathUtils.clamp(err * 4, -YAW_RATE, YAW_RATE) * steer
       yawRate.current +=
@@ -337,20 +350,26 @@ export function Flight({
         0.18 +
         THREE.MathUtils.smoothstep(along, ARRIVAL_RADIUS, SLOWDOWN_RADIUS) * 0.82
       const approach = 0.18 * THREE.MathUtils.smoothstep(horiz, 0, ARRIVAL_RADIUS)
-      const targetSpeed = CRUISE * turnFactor * (capturing ? approach : cruise)
+      const targetSpeed = pivot
+        ? 0
+        : CRUISE * turnFactor * (capturing ? approach : cruise)
       speed.current += (targetSpeed - speed.current) * (1 - Math.exp(-d * 3.2))
 
-      g.position.x += Math.sin(yaw.current) * speed.current * d
-      g.position.z += Math.cos(yaw.current) * speed.current * d
-      g.position.y += (dest.y - g.position.y) * (1 - Math.exp(-d * 1.5))
-      // Capture fade is 0 at the 2u boundary so the pull cannot spike velocity.
-      if (capturing && dist > 1e-5) {
-        const fade = THREE.MathUtils.smoothstep(
-          ARRIVAL_RADIUS - dist,
-          0,
-          ARRIVAL_RADIUS,
-        )
-        g.position.lerp(dest, 1 - Math.exp(-d * CAPTURE * fade))
+      if (pivot) {
+        g.position.lerp(dest, 1 - Math.exp(-d * CAPTURE))
+      } else {
+        g.position.x += Math.sin(yaw.current) * speed.current * d
+        g.position.z += Math.cos(yaw.current) * speed.current * d
+        g.position.y += (dest.y - g.position.y) * (1 - Math.exp(-d * 1.5))
+        // Capture fade is 0 at the 2u boundary so the pull cannot spike velocity.
+        if (capturing && dist > 1e-5) {
+          const fade = THREE.MathUtils.smoothstep(
+            ARRIVAL_RADIUS - dist,
+            0,
+            ARRIVAL_RADIUS,
+          )
+          g.position.lerp(dest, 1 - Math.exp(-d * CAPTURE * fade))
+        }
       }
 
       g.rotation.y = yaw.current
@@ -364,6 +383,7 @@ export function Flight({
       if (
         g.position.distanceTo(dest) < DOCK_RADIUS &&
         speed.current < DOCK_SPEED &&
+        linedUp &&
         !arrived.current
       ) {
         arrived.current = true

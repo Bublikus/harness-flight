@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { getSlideArt } from '../SlideArt'
-import { SLIDES, type Slide } from '../slides'
+import { FINALE, SLIDES, type Slide } from '../slides'
 import { waypointPose } from './route'
 import { blockMaterials } from './blockTextures'
 import { playRiseWhoosh } from './FlightAudio'
@@ -132,8 +132,13 @@ function routePose(index: number, facing: 1 | -1) {
   }
 }
 
+function boardId(index: number, finale: boolean) {
+  return finale ? FINALE.id : SLIDES[index].id
+}
+
 function WorldSlideCard({
   index,
+  finale,
   started,
   flying,
   approaching,
@@ -143,6 +148,7 @@ function WorldSlideCard({
   onExited,
 }: {
   index: number
+  finale: boolean
   started: boolean
   flying: boolean
   approaching: boolean
@@ -159,7 +165,7 @@ function WorldSlideCard({
   const side = useRef<1 | -1>(Math.random() < 0.5 ? 1 : -1)
   const rising = useRef(false)
   const { gl, viewport } = useThree()
-  const slide = SLIDES[index]
+  const slide = finale ? FINALE : SLIDES[index]
   const pose = useMemo(() => routePose(index, facing), [index, facing])
   const raised = active && started && (!flying || approaching) && !hidden
   const frame = useMemo(() => blockMaterials('plank', [WIDTH + 0.5, HEIGHT + 0.5, 0.34]), [])
@@ -276,6 +282,7 @@ function WorldSlideCard({
 
 export function WorldSlide({
   index,
+  finale,
   started,
   flying,
   approaching,
@@ -283,45 +290,47 @@ export function WorldSlide({
   hidden,
 }: {
   index: number
+  finale: boolean
   started: boolean
   flying: boolean
   approaching: boolean
   facing: 1 | -1
   hidden: boolean
 }) {
+  const current = boardId(index, finale)
   const [state, setState] = useState(() => ({
-    current: index,
-    cards: [{ index, facing }],
+    current,
+    cards: [{ index, facing, finale }],
   }))
-  if (state.current !== index)
+  if (state.current !== current)
     setState({
-      current: index,
-      cards: state.cards.some((card) => card.index === index)
+      current,
+      cards: state.cards.some((card) => boardId(card.index, card.finale) === current)
         ? state.cards
-        : [...state.cards, { index, facing }],
+        : [...state.cards, { index, facing, finale }],
     })
 
-  const remove = useCallback((exited: number) => {
+  const remove = useCallback((exited: string) => {
     setState((state) =>
       exited === state.current
         ? state
         : {
             ...state,
-            cards: state.cards.filter((card) => card.index !== exited),
+            cards: state.cards.filter((card) => boardId(card.index, card.finale) !== exited),
           },
     )
   }, [])
 
   return state.cards.map((card) => (
     <WorldSlideCard
-      key={SLIDES[card.index].id}
+      key={boardId(card.index, card.finale)}
       {...card}
       started={started}
       flying={flying}
       approaching={approaching}
       hidden={hidden}
-      active={card.index === index}
-      onExited={() => remove(card.index)}
+      active={boardId(card.index, card.finale) === current}
+      onExited={() => remove(boardId(card.index, card.finale))}
     />
   ))
 }

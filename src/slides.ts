@@ -156,4 +156,19 @@ export const SLIDES: Slide[] = [
   },
 ]
 
+/** Last talk checkpoint — finale is a second visit here, not a 13th pose. */
+export const LAST_CHECKPOINT = SLIDES.length - 1
+
+export const FINALE: Slide = {
+  id: 'finale',
+  era: 'End',
+  title: 'Your move',
+  lead: 'The plane is the agent. You still pick the route.',
+  points: ['Questions.'],
+  speakerNotes: [
+    'Hold for questions. The ask remains one real ticket through /ship.',
+    'If energy is high, invite the first owner and the first retrospective date.',
+  ],
+}
+
 export const WAYPOINT_SPACING = 58

@@ -12,7 +12,7 @@ import {
   toggleMuted,
   unlockAudio,
 } from './scene/FlightAudio'
-import { SLIDES } from './slides'
+import { LAST_CHECKPOINT, SLIDES } from './slides'
 import { usePresentationSync } from './presentationSync'
 import './index.css'
 
@@ -31,11 +31,16 @@ export default function App() {
   const [approaching, setApproaching] = useState(false)
   const [turnDirection, setTurnDirection] = useState<TurnDirection>(0)
   const [facing, setFacing] = useState<1 | -1>(1)
+  const [seenLast, setSeenLast] = useState(false)
+  const [finaleReady, setFinaleReady] = useState(false)
+  const [spunAtLast, setSpunAtLast] = useState(false)
   const [slideHidden, setSlideHidden] = useState(false)
   const [muted, setMuted] = useState(readMuted)
   const [volume, setVol] = useState(readVolume)
   const upTarget = index + facing
   const downTarget = index - facing
+  const finale = index === LAST_CHECKPOINT && finaleReady
+  const pastEnd = upTarget >= SLIDES.length
 
   useEffect(() => {
     setSlideHidden(false)
@@ -48,11 +53,30 @@ export default function App() {
     setFlying(true)
     setApproaching(false)
     setTurnDirection(turn)
+    if (index === LAST_CHECKPOINT && next !== LAST_CHECKPOINT && seenLast)
+      setFinaleReady(true)
+    if (next !== LAST_CHECKPOINT) setSpunAtLast(false)
     if ((next - index) * facing < 0)
       setFacing(facing === 1 ? -1 : 1)
     setBackIndex(index)
     setIndex(next)
-  }, [facing, index])
+  }, [facing, index, seenLast])
+
+  const aboutFace = useCallback(() => {
+    unlockAudio()
+    playHopWhoosh()
+    setFlying(true)
+    setApproaching(false)
+    setTurnDirection(1)
+    setFacing((f) => (f === 1 ? -1 : 1))
+    setSpunAtLast(true)
+  }, [])
+
+  const flyForward = useCallback(() => {
+    if (!flying && index === LAST_CHECKPOINT && facing === 1 && pastEnd)
+      aboutFace()
+    else go(upTarget)
+  }, [aboutFace, facing, flying, go, index, pastEnd, upTarget])
 
   const startTalk = useCallback(() => {
     unlockAudio()
@@ -84,7 +108,7 @@ export default function App() {
       if (e.code === 'Space' || e.code === 'ArrowUp') {
         e.preventDefault()
         if (!started) startTalk()
-        else go(upTarget)
+        else flyForward()
       }
       if (e.code === 'ArrowDown') {
         e.preventDefault()
@@ -109,7 +133,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [started, upTarget, downTarget, go, turnBack, startTalk, flipMute])
+  }, [started, upTarget, downTarget, flyForward, go, turnBack, startTalk, flipMute])
 
   return (
     <div className="app">
@@ -119,12 +143,14 @@ export default function App() {
         flying={flying}
         approaching={approaching}
         facing={facing}
-        slideHidden={slideHidden}
+        finale={finale}
+        slideHidden={slideHidden || spunAtLast}
         turnDirection={turnDirection}
         onApproach={() => setApproaching(true)}
         onArrived={() => {
           setFlying(false)
           setApproaching(false)
+          if (index === LAST_CHECKPOINT) setSeenLast(true)
         }}
       />
       {started ? (
@@ -135,7 +161,8 @@ export default function App() {
             canTurnBack={backIndex !== null}
             upTarget={upTarget}
             downTarget={downTarget}
-            onUp={() => go(upTarget)}
+            canAboutFace={!flying && index === LAST_CHECKPOINT && facing === 1}
+            onUp={flyForward}
             onDown={() => go(downTarget)}
             onTurnLeft={() => turnBack(1)}
             onTurnRight={() => turnBack(-1)}

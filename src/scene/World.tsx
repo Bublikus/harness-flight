@@ -114,6 +114,7 @@ export function World({
   flying,
   approaching,
   facing,
+  finale,
   slideHidden,
   turnDirection,
   onApproach,
@@ -124,6 +125,7 @@ export function World({
   flying: boolean
   approaching: boolean
   facing: 1 | -1
+  finale: boolean
   slideHidden: boolean
   turnDirection: TurnDirection
   onApproach: () => void
@@ -146,6 +148,7 @@ export function World({
       <Beacons current={index} />
       <WorldSlide
         index={index}
+        finale={finale}
         started={started}
         flying={flying}
         approaching={approaching}
@@ -155,6 +158,7 @@ export function World({
       <Flight
         index={index}
         flying={flying}
+        facing={facing}
         turnDirection={turnDirection}
         onApproach={onApproach}
         onArrived={onArrived}
