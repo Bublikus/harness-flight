@@ -32,14 +32,14 @@ function terminusLift(x: number, z: number, p: { x: number; z: number; yaw: numb
   const along = dx * Math.sin(p.yaw) + dz * Math.cos(p.yaw)
   const across = dx * Math.cos(p.yaw) - dz * Math.sin(p.yaw)
   // Caps keep longer end runout / angled yaw from towering past start-scale hills.
-  const out = Math.min(14, Math.max(0, along * dir - 2))
-  const side = Math.min(12, Math.max(0, Math.abs(across) - 10))
+  const out = Math.min(10, Math.max(0, along * dir - 2))
+  const side = Math.min(8, Math.max(0, Math.abs(across) - 10))
   // Back/forward hills reach farther; side mass stays local to the terminus.
   const alongNear = Math.exp((-along * along) / (32 * 32))
   const sideNear = Math.exp((-along * along) / (16 * 16))
-  const h = alongNear * out * 0.55 + sideNear * side * 0.35
+  const h = alongNear * out * 0.4 + sideNear * side * 0.25
   if (h < 0.4) return 0
-  return Math.min(12, h + 2.2 + n2(x + dir * 9, z) * 1.6)
+  return Math.min(8, h + 1.4 + n2(x + dir * 9, z) * 1.0)
 }
 
 /** Extra mass on the Z padding belts so mesh edges stay closed. */
@@ -47,18 +47,40 @@ function padCurtain(z: number) {
   const a = Math.max(0, ROUTE_Z_MIN + 14 - z)
   const b = Math.max(0, z - (ROUTE_Z_MAX - 14))
   const t = Math.max(a, b)
-  return t > 0 ? t * 0.28 + 1.8 + n2(3, z) * 0.9 : 0
+  return t > 0 ? t * 0.18 + 1.2 + n2(3, z) * 0.9 : 0
+}
+
+/**
+ * Screen-left takeoff flank (looking +Z: camera right = −X, so +across is left).
+ * Peaks on ROUTE_X_MAX and runs along the rim so the start cam cannot see the grass cliff.
+ */
+function startViewLeftFlank(x: number, z: number) {
+  const dx = x - ROUTE_START.x
+  const dz = z - ROUTE_START.z
+  const along = dx * Math.sin(ROUTE_START.yaw) + dz * Math.cos(ROUTE_START.yaw)
+  const across = dx * Math.cos(ROUTE_START.yaw) - dz * Math.sin(ROUTE_START.yaw)
+  // +across = world +X = screen left at start. Keep corridor open.
+  if (across < 14) return 0
+  // Strongest at the mesh rim; fills inward to the corridor shoulder.
+  const fromEdge = ROUTE_X_MAX - across
+  const band = Math.exp(-(fromEdge * fromEdge) / (9 * 9))
+  // Long enough that the left rim stays raised through the start FOV.
+  const near = Math.exp((-along * along) / (58 * 58))
+  const h = near * band * (10.5 + n2(x * 0.7, z + 5) * 1.5)
+  if (h < 0.5) return 0
+  return Math.min(12, h)
 }
 
 export function terrainHeight(x: number, z: number) {
   const lat = pathLateral(x, z)
-  const ridge = Math.max(0, Math.abs(lat) - 16) * 0.55
-  const hills = Math.sin(z * 0.07) * 1.4 + Math.sin(x * 0.2 + z * 0.05) * 1.1
-  const mtn = ridge > 0 ? ridge + n2(x, z) * 3 : 0
+  const ridge = Math.max(0, Math.abs(lat) - 16) * 0.27
+  const hills = Math.sin(z * 0.07) * 1.2 + Math.sin(x * 0.2 + z * 0.05) * 0.9
+  const mtn = ridge > 0 ? ridge + n2(x, z) * 1.4 : 0
   const gates =
     terminusLift(x, z, ROUTE_START, -1) +
     terminusLift(x, z, ROUTE_END, 1) +
-    padCurtain(z)
+    padCurtain(z) +
+    startViewLeftFlank(x, z)
   // Angled end bowl sits in corridor-ridge zone — damp ridges under gates so ends match.
   const mtnEff = gates > 0 ? mtn * Math.max(0, 1 - gates / 8) : mtn
   return Math.max(0, Math.round(hills + mtnEff + gates))
@@ -77,15 +99,15 @@ export function treePerches(): { x: number; y: number; z: number }[] {
       const top = h >= 9 ? 'snow' : h >= 6 ? 'stone' : 'grass'
       if (top === 'grass' && h <= 3 && Math.abs(lat) > 3) {
         const t = n2(x * 3, z * 3)
-        if (t > 0.984) {
+        if (t > 0.993) {
           const th = 3 + Math.floor(n2(z, x) * 2)
           out.push({ x, y: h + th + 2.35, z })
-        } else if (t > 0.972) {
+        } else if (t > 0.987) {
           const th = 4 + Math.floor(n2(x, z) * 2)
           out.push({ x, y: h + th + 2.35, z })
         }
       }
-      if (top === 'stone' && h >= 6 && n2(x, z) > 0.97) {
+      if (top === 'stone' && h >= 6 && n2(x, z) > 0.988) {
         out.push({ x, y: h + 5.35, z })
       }
     }
@@ -221,8 +243,8 @@ function buildRange(z0: number, z1: number): Bucket[] {
 
       if (top === 'grass' && h <= 3 && Math.abs(lat) > 3) {
         const t = n2(x * 3, z * 3)
-        if (t > 0.984) oak(x, h, z)
-        else if (t > 0.972) birchTree(x, h, z)
+        if (t > 0.993) oak(x, h, z)
+        else if (t > 0.987) birchTree(x, h, z)
         else if (t > 0.91) push(B.tall, x, h + 0.7, z)
         else if (t > 0.88) push(r > 0.5 ? B.flowerY : B.flowerR, x, h + 0.7, z)
         else if (t > 0.868) push(B.pumpkin, x, h + 0.7, z)
@@ -233,7 +255,7 @@ function buildRange(z0: number, z1: number): Bucket[] {
         }
       }
 
-      if (top === 'stone' && h >= 6 && r > 0.97) spruceTree(x, h, z)
+      if (top === 'stone' && h >= 6 && r > 0.988) spruceTree(x, h, z)
     }
   }
 
