@@ -2,7 +2,13 @@ import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { Plane } from './Plane'
-import { nearestPath, pathAt, waypointPose, waypointPos } from './route'
+import {
+  nearestPath,
+  pathAt,
+  ROUTE_WAVELENGTH,
+  waypointPose,
+  waypointPos,
+} from './route'
 import { setFlightMix } from './FlightAudio'
 import { planePose } from './worldPoses'
 
@@ -13,6 +19,9 @@ const look = new THREE.Vector3()
 const behind = new THREE.Vector3()
 const dest = new THREE.Vector3()
 const CRUISE = 28
+/** Path-length scale vs one nominal hop; farther clicks cruise faster. */
+const HOP_SPEED_MIN = 1
+const HOP_SPEED_MAX = 4
 /** Mid-hop speed ease; takeoff uses SPEED_RESP_SPOOL then blends up. */
 const SPEED_RESP = 4.2
 const SPEED_RESP_SPOOL = 1.25
@@ -286,6 +295,7 @@ export function Flight({
   const accelFeel = useRef(0)
   const lensFeel = useRef(0)
   const hopAge = useRef(0)
+  const hopSpeed = useRef(1)
   const orbitTarget = useRef({ x: 0, y: 0 })
   const orbit = useRef({ x: 0, y: 0 })
 
@@ -308,6 +318,14 @@ export function Flight({
     if (!g) return
     const d = Math.min(dt, 0.05)
 
+    const destPose = waypointPose(index)
+    dest.set(destPose.x, destPose.y, destPose.z)
+    const near = nearestPath(g.position.x, g.position.z, pathS.current)
+    pathS.current = near.s
+    const remain = destPose.s - near.s
+    const alongDir = remain >= 0 ? 1 : -1
+    const along = Math.abs(remain)
+
     if (
       lastIndex.current !== index ||
       lastTurnDirection.current !== turnDirection ||
@@ -318,18 +336,15 @@ export function Flight({
       approaching.current = false
       arrived.current = false
       hopAge.current = 0
+      hopSpeed.current = THREE.MathUtils.clamp(
+        along / ROUTE_WAVELENGTH,
+        HOP_SPEED_MIN,
+        HOP_SPEED_MAX,
+      )
     }
     wasFlying.current = flying
     if (flying) hopAge.current += d
     else hopAge.current = 0
-
-    const destPose = waypointPose(index)
-    dest.set(destPose.x, destPose.y, destPose.z)
-    const near = nearestPath(g.position.x, g.position.z, pathS.current)
-    pathS.current = near.s
-    const remain = destPose.s - near.s
-    const alongDir = remain >= 0 ? 1 : -1
-    const along = Math.abs(remain)
     const lookS =
       alongDir > 0
         ? Math.min(near.s + LOOKAHEAD, destPose.s + 2)
@@ -383,7 +398,10 @@ export function Flight({
       const approach = 0.18 * THREE.MathUtils.smoothstep(horiz, 0, ARRIVAL_RADIUS)
       const targetSpeed = pivot
         ? 0
-        : CRUISE * turnFactor * (capturing ? approach : cruise)
+        : CRUISE *
+          hopSpeed.current *
+          turnFactor *
+          (capturing ? approach : cruise)
       const spool = THREE.MathUtils.smoothstep(hopAge.current, SPOOL_IN, SPOOL_OUT)
       const speedResp =
         SPEED_RESP_SPOOL + (SPEED_RESP - SPEED_RESP_SPOOL) * spool

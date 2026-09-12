@@ -11,6 +11,7 @@ export function Hud({
   onDown,
   onTurnLeft,
   onTurnRight,
+  onSelect,
 }: {
   index: number
   muted: boolean
@@ -22,6 +23,7 @@ export function Hud({
   onDown: () => void
   onTurnLeft: () => void
   onTurnRight: () => void
+  onSelect: (i: number) => void
 }) {
   return (
     <div className="hud">
@@ -47,11 +49,15 @@ export function Hud({
           onTurnLeft={onTurnLeft}
           onTurnRight={onTurnRight}
         />
-        <div className="dots">
+        <div className="dots" role="navigation" aria-label="Waypoints">
           {SLIDES.map((sl, i) => (
-            <span
+            <button
               key={sl.id}
+              type="button"
               className={i === index ? 'dot on' : i < index ? 'dot done' : 'dot'}
+              aria-label={`Fly to waypoint ${i + 1}`}
+              aria-current={i === index ? 'step' : undefined}
+              onClick={() => onSelect(i)}
             />
           ))}
         </div>

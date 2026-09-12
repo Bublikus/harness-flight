@@ -48,7 +48,7 @@ export default function App() {
   }, [index])
 
   const go = useCallback((next: number, turn: TurnDirection = 0) => {
-    if (next < 0 || next >= SLIDES.length) return
+    if (next < 0 || next >= SLIDES.length || next === index) return
     unlockAudio()
     playHopWhoosh()
     setFlying(true)
@@ -167,6 +167,7 @@ export default function App() {
             onDown={() => go(downTarget)}
             onTurnLeft={() => turnBack(1)}
             onTurnRight={() => turnBack(-1)}
+            onSelect={go}
           />
           <AssistOverlay index={index} />
         </>

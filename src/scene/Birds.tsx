@@ -7,7 +7,7 @@ import { terrainHeight, treePerches } from './Terrain'
 import { planePose, slidePose } from './worldPoses'
 
 /** Scattered agents · small local flocks · optional tree perches · rare slide flybys. */
-const COUNT = 17
+const COUNT = 20
 const SEP_R = 5.2
 const VIS_R = 5.5
 const SEP_W = 2.35

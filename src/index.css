@@ -161,18 +161,30 @@ button:active:not(:disabled) {
   padding-bottom: 4px;
 }
 
-.dot {
+button.dot {
   width: 9px;
   height: 9px;
+  min-width: 9px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  cursor: pointer;
   background: rgba(255, 255, 255, 0.35);
+  box-shadow: 1px 1px 0 #2a5080;
+  color: transparent;
+  font-size: 0;
+}
+
+button.dot:active:not(:disabled) {
+  transform: none;
   box-shadow: 1px 1px 0 #2a5080;
 }
 
-.dot.on {
+button.dot.on {
   background: var(--gold);
 }
 
-.dot.done {
+button.dot.done {
   background: #8fd15a;
 }
 
