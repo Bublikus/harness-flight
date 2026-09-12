@@ -174,7 +174,7 @@ export function TitleScreen({ onStart }: { onStart: () => void }) {
       </p>
       <FlightPad upDisabled downDisabled turnDisabled />
       <p className="hint">Tap / Space / ↑ start · ↑/↓ paginate · ←/→ U-turn and reverse</p>
-      <p className="shortcuts">N — speaker notes<br />H — hide/show slide<br />M — mute</p>
+      <p className="shortcuts">N — speaker notes<br />H — hide/show slides<br />M — mute</p>
     </div>
   )
 }

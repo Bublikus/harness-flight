@@ -35,17 +35,14 @@ export default function App() {
   const [seenLast, setSeenLast] = useState(false)
   const [finaleReady, setFinaleReady] = useState(false)
   const [spunAtLast, setSpunAtLast] = useState(false)
-  const [slideHidden, setSlideHidden] = useState(false)
+  /** Session toggle: boards stay sunk across hops until H again. */
+  const [slidesHidden, setSlidesHidden] = useState(false)
   const [muted, setMuted] = useState(readMuted)
   const [volume, setVol] = useState(readVolume)
   const upTarget = index + facing
   const downTarget = index - facing
   const finale = index === LAST_CHECKPOINT && finaleReady
   const pastEnd = upTarget >= SLIDES.length
-
-  useEffect(() => {
-    setSlideHidden(false)
-  }, [index])
 
   const go = useCallback((next: number, turn: TurnDirection = 0) => {
     if (next < 0 || next >= SLIDES.length || next === index) return
@@ -124,7 +121,7 @@ export default function App() {
       if (e.code === 'KeyH') {
         if (typing || !started) return
         e.preventDefault()
-        setSlideHidden((hidden) => !hidden)
+        setSlidesHidden((hidden) => !hidden)
       }
       if (e.code === 'KeyM') {
         if (typing) return
@@ -145,7 +142,7 @@ export default function App() {
         approaching={approaching}
         facing={facing}
         finale={finale}
-        slideHidden={slideHidden || spunAtLast}
+        slideHidden={slidesHidden || spunAtLast}
         turnDirection={turnDirection}
         onApproach={() => setApproaching(true)}
         onArrived={() => {

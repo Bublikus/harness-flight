@@ -25,7 +25,7 @@ Index of lasting presentation choices. Procedure: `adr` skill.
 | [0019](0019-corridor-flybys-plane-slide.md) | Corridor flybys between plane and slide | Superseded by ADR-0021 |
 | [0020](0020-directional-shadow-maps.md) | Directional shadow maps for bird silhouettes | Accepted |
 | [0021](0021-one-flyby-per-slide-session.md) | One corridor flyby per slide session | Accepted |
-| [0022](0022-presenter-h-toggle-slide.md) | Presenter H-toggle for the current slide | Accepted |
+| [0022](0022-presenter-h-toggle-slide.md) | Presenter H-toggle for the current slide | Superseded by ADR-0032 |
 | [0023](0023-soft-y-gradient-sky.md) | Soft Y-gradient sky dome | Accepted |
 | [0024](0024-web-audio-procedural-sfx.md) | Web Audio procedural SFX | Accepted |
 | [0025](0025-meandering-route.md) | Seeded meandering route as layout source | Superseded by ADR-0026 |
@@ -35,6 +35,7 @@ Index of lasting presentation choices. Procedure: `adr` skill.
 | [0029](0029-mobile-world-lod.md) | Mobile world LOD (coarser terrain + lighter shadows) | Superseded by ADR-0030 |
 | [0030](0030-full-world-mobile-runtime-opts.md) | Full world with mobile runtime opts (chunk stream + cheaper GPU) | Accepted |
 | [0031](0031-desktop-postprocessing-motion-blur.md) | Desktop EffectComposer motion blur scaled by plane speed | Accepted |
+| [0032](0032-persistent-h-hide-slides.md) | Persistent H-hide across waypoints | Accepted |
 
 Restore a talk version with `git log --oneline` then `git checkout <commit>`:
 

@@ -1,6 +1,6 @@
 # ADR-0022: Presenter H-toggle for the current slide
 
-- Status: Accepted
+- Status: Superseded by ADR-0032
 - Date: 2026-09-11
 - Deciders: this session
 
