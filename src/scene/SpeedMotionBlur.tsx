@@ -10,9 +10,9 @@ import { planePose } from './worldPoses'
 const BLUR_IN = 14
 const BLUR_OUT = 90
 /** Peak radial/camera streak — subtle cue only; FOV fisheye stays primary. */
-const BLUR_MAX = 0.014
+const BLUR_MAX = 0.0098
 const BLUR_EASE = 4.5
-const VEL_SCALE = 0.028
+const VEL_SCALE = 0.0196
 
 const fragment = /* glsl */ `
 uniform float intensity;
