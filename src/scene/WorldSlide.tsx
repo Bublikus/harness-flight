@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { getSlideArt } from '../SlideArt'
 import { SLIDES, type Slide } from '../slides'
-import { waypointPos } from './Beacons'
+import { waypointPose } from './route'
 import { blockMaterials } from './blockTextures'
 import { playRiseWhoosh } from './FlightAudio'
 import { slidePose } from './worldPoses'
@@ -122,22 +122,13 @@ function drawSlide(canvas: HTMLCanvasElement, slide: Slide) {
 }
 
 function routePose(index: number, facing: 1 | -1) {
-  const [x, y, z] = waypointPos(index)
-  const previous = index - facing
-  const [rx, , rz] = waypointPos(
-    previous >= 0 && previous < SLIDES.length ? previous : index + facing,
-  )
-  const sign = previous >= 0 && previous < SLIDES.length ? 1 : -1
-  const dx = (x - rx) * sign
-  const dz = (z - rz) * sign
-  const length = Math.hypot(dx, dz)
-  const forwardX = dx / length
-  const forwardZ = dz / length
+  const p = waypointPose(index)
+  const travel = facing === 1 ? p.yaw : p.yaw + Math.PI
   return {
-    x: x + forwardX * 4.8,
-    y: y + 3,
-    z: z + forwardZ * 4.8,
-    rotation: Math.atan2(-forwardX, -forwardZ),
+    x: p.x + Math.sin(travel) * 4.8,
+    y: p.y + 3,
+    z: p.z + Math.cos(travel) * 4.8,
+    rotation: travel + Math.PI,
   }
 }
 

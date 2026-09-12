@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { Plane } from './Plane'
-import { waypointPos } from './Beacons'
+import { nearestPath, pathAt, waypointPose, waypointPos } from './route'
 import { setFlightMix } from './FlightAudio'
 import { planePose } from './worldPoses'
 
@@ -14,6 +14,7 @@ const behind = new THREE.Vector3()
 const dest = new THREE.Vector3()
 const CRUISE = 26
 const YAW_RATE = 3.3
+const LOOKAHEAD = 14
 const SLOWDOWN_RADIUS = 28
 const ARRIVAL_RADIUS = 2
 const DOCK_RADIUS = 0.12
@@ -245,6 +246,7 @@ export function Flight({
   const lastIndex = useRef(index)
   const lastTurnDirection = useRef(turnDirection)
   const yaw = useRef(0)
+  const pathS = useRef(0)
   const cameraYaw = useRef(0)
   const yawRate = useRef(0)
   const speed = useRef(0)
@@ -285,12 +287,26 @@ export function Flight({
       arrived.current = false
     }
 
-    dest.set(...waypointPos(index))
+    const destPose = waypointPose(index)
+    dest.set(destPose.x, destPose.y, destPose.z)
+    const near = nearestPath(g.position.x, g.position.z, pathS.current)
+    pathS.current = near.s
+    const remain = destPose.s - near.s
+    const alongDir = remain >= 0 ? 1 : -1
+    const along = Math.abs(remain)
+    const lookS =
+      alongDir > 0
+        ? Math.min(near.s + LOOKAHEAD, destPose.s + 2)
+        : Math.max(near.s - LOOKAHEAD, destPose.s - 2)
+    const ahead = pathAt(lookS)
+    const adx = ahead.x - g.position.x
+    const adz = ahead.z - g.position.z
     const dx = dest.x - g.position.x
     const dz = dest.z - g.position.z
     const dist = Math.hypot(dx, dz, dest.y - g.position.y)
     const horiz = Math.hypot(dx, dz)
-    const desired = horiz > 0.05 ? Math.atan2(dx, dz) : yaw.current
+    const desired =
+      Math.hypot(adx, adz) > 0.05 ? Math.atan2(adx, adz) : yaw.current
     let err = wrapPi(desired - yaw.current)
     if (turnDirection && Math.abs(err) > Math.PI / 2)
       err = turnDirection * Math.abs(err)
@@ -319,7 +335,7 @@ export function Flight({
       const turnFactor = turning ? 0.32 + 0.28 * aligned : 0.55 + 0.45 * aligned
       const cruise =
         0.18 +
-        THREE.MathUtils.smoothstep(horiz, ARRIVAL_RADIUS, SLOWDOWN_RADIUS) * 0.82
+        THREE.MathUtils.smoothstep(along, ARRIVAL_RADIUS, SLOWDOWN_RADIUS) * 0.82
       const approach = 0.18 * THREE.MathUtils.smoothstep(horiz, 0, ARRIVAL_RADIUS)
       const targetSpeed = CRUISE * turnFactor * (capturing ? approach : cruise)
       speed.current += (targetSpeed - speed.current) * (1 - Math.exp(-d * 3.2))
@@ -338,7 +354,9 @@ export function Flight({
       }
 
       g.rotation.y = yaw.current
-      const bank = (-yawRate.current / YAW_RATE) * 0.68 * (capturing ? 0.5 : 1)
+      const rateBank = (-yawRate.current / YAW_RATE) * 0.68
+      const pathBank = THREE.MathUtils.clamp(-near.kappa * alongDir * 6, -0.42, 0.42)
+      const bank = (rateBank + pathBank) * (capturing ? 0.5 : 1)
       const pitch = (turning ? 0.16 : 0.07) * (capturing ? steer : 1)
       bankZ.current += (bank - bankZ.current) * (1 - Math.exp(-d * 6))
       pitchX.current += (pitch - pitchX.current) * (1 - Math.exp(-d * 5))
@@ -401,7 +419,7 @@ export function Flight({
     // Cruise-only air motes: fade through the slowdown, gone at capture/park.
     const cruise =
       flying
-        ? THREE.MathUtils.smoothstep(dist, ARRIVAL_RADIUS, SLOWDOWN_RADIUS) *
+        ? THREE.MathUtils.smoothstep(along, ARRIVAL_RADIUS, SLOWDOWN_RADIUS) *
           THREE.MathUtils.smoothstep(speed.current, 3.5, 16)
         : 0
     windVis.current += (cruise - windVis.current) * (1 - Math.exp(-d * 3.6))

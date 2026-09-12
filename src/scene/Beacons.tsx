@@ -1,13 +1,7 @@
 import { useMemo } from 'react'
-import { SLIDES, WAYPOINT_SPACING } from '../slides'
+import { SLIDES } from '../slides'
 import { blockMaterials } from './blockTextures'
-
-export function waypointPos(i: number): [number, number, number] {
-  const z = 8 + i * WAYPOINT_SPACING
-  const x = Math.sin(i * 0.62) * 6
-  const y = 11.5 + Math.sin(i * 0.45) * 1.4
-  return [x, y, z]
-}
+import { waypointPose } from './route'
 
 const POST = 8
 
@@ -32,10 +26,10 @@ export function Beacons({ current }: { current: number }) {
   return (
     <group>
       {SLIDES.map((s, i) => {
-        const [x, , z] = waypointPos(i)
+        const p = waypointPose(i)
         const on = i === current
         return (
-          <group key={s.id} position={[x, 0, z]}>
+          <group key={s.id} position={[p.x, 0, p.z]} rotation={[0, p.yaw, 0]}>
             <Block p={[0, 0.4, 0]} s={[1.5, 0.8, 1.5]} kind="cobble" />
             <Block p={[0, 0.9, 0]} s={[1.1, 0.3, 1.1]} kind="stone" />
             <Block p={[0, POST / 2, 0]} s={[0.7, POST, 0.7]} kind={on ? 'wood' : 'spruce'} />

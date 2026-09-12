@@ -28,6 +28,8 @@ Index of lasting presentation choices. Procedure: `adr` skill.
 | [0022](0022-presenter-h-toggle-slide.md) | Presenter H-toggle for the current slide | Accepted |
 | [0023](0023-soft-y-gradient-sky.md) | Soft Y-gradient sky dome | Accepted |
 | [0024](0024-web-audio-procedural-sfx.md) | Web Audio procedural SFX | Accepted |
+| [0025](0025-meandering-route.md) | Seeded meandering route as layout source | Superseded by ADR-0026 |
+| [0026](0026-path-following-hops.md) | Irregular route; hops follow the polyline | Accepted |
 
 Restore a talk version with `git log --oneline` then `git checkout <commit>`:
 

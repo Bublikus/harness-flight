@@ -1,16 +1,13 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { SLIDES, WAYPOINT_SPACING } from '../slides'
 import { blockMaterials } from './blockTextures'
+import { pathLateral, pathX, ROUTE_VALLEY, ROUTE_Z_MAX, ROUTE_Z_MIN } from './route'
 import { terrainHeight, treePerches } from './Terrain'
 import { planePose, slidePose } from './worldPoses'
 
 /** Scattered agents · small local flocks · optional tree perches · rare slide flybys. */
 const COUNT = 17
-const X_MAX = 17
-const Z_MIN = -6
-const Z_MAX = SLIDES.length * WAYPOINT_SPACING + 24
 const SEP_R = 5.2
 const VIS_R = 5.5
 const SEP_W = 2.35
@@ -92,8 +89,8 @@ function pickPurpose(i: number): Purpose {
 }
 
 function skyPoint(purpose: Purpose, out: THREE.Vector3) {
-  const x = rnd(-X_MAX + 1.5, X_MAX - 1.5)
-  const z = rnd(Z_MIN + 4, Z_MAX - 4)
+  const z = rnd(ROUTE_Z_MIN + 4, ROUTE_Z_MAX - 4)
+  const x = pathX(z) + rnd(-ROUTE_VALLEY + 1.5, ROUTE_VALLEY - 1.5)
   const floor = terrainHeight(x, z) + CLEARANCE
   const loft =
     purpose === 'forage' ? rnd(1.2, 4.5) : purpose === 'commute' ? rnd(5, ALT_PAD - 1) : rnd(2.5, ALT_PAD - 0.5)
@@ -106,8 +103,8 @@ function seedBirds(perches: { x: number; y: number; z: number }[]): Bird[] {
   for (let i = 0; i < COUNT; i++) {
     const purpose = pickPurpose(i)
     const group = purpose === 'solo' ? -1 - i : i % groups
-    const x = rnd(-X_MAX + 2, X_MAX - 2)
-    const z = rnd(Z_MIN + 8, Z_MAX - 8)
+    const z = rnd(ROUTE_Z_MIN + 8, ROUTE_Z_MAX - 8)
+    const x = pathX(z) + rnd(-ROUTE_VALLEY + 2, ROUTE_VALLEY - 2)
     const y = terrainHeight(x, z) + CLEARANCE + rnd(2, 9)
     const heading = rnd(0, Math.PI * 2)
     const minSp = MIN_SPEED + rnd(0, 1.1)
@@ -848,10 +845,11 @@ export function Birds() {
         steer.y += Math.sin(w * 0.9 + 1.1) * WANDER_W * 0.45
         steer.z += Math.cos(w * 1.1) * WANDER_W
 
-        if (b.p.x < -X_MAX) steer.x += BOUND_W
-        else if (b.p.x > X_MAX) steer.x -= BOUND_W
-        if (b.p.z < Z_MIN) steer.z += BOUND_W
-        else if (b.p.z > Z_MAX) steer.z -= BOUND_W
+        const lat = pathLateral(b.p.x, b.p.z)
+        if (lat < -ROUTE_VALLEY) steer.x += BOUND_W
+        else if (lat > ROUTE_VALLEY) steer.x -= BOUND_W
+        if (b.p.z < ROUTE_Z_MIN) steer.z += BOUND_W
+        else if (b.p.z > ROUTE_Z_MAX) steer.z -= BOUND_W
 
         const floor = terrainHeight(b.p.x, b.p.z) + CLEARANCE
         const ceiling = floor + ALT_PAD

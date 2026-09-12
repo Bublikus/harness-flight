@@ -1,17 +1,22 @@
 import { useMemo } from 'react'
 import * as THREE from 'three'
 import { blockMaterials } from './blockTextures'
-import { SLIDES, WAYPOINT_SPACING } from '../slides'
-
-const W = 22
-const LEN = SLIDES.length * WAYPOINT_SPACING + 40
+import {
+  pathLateral,
+  pathX,
+  ROUTE_X_MAX,
+  ROUTE_X_MIN,
+  ROUTE_Z_MAX,
+  ROUTE_Z_MIN,
+} from './route'
 
 function n2(x: number, z: number) {
   return Math.abs(Math.sin(x * 12.9898 + z * 78.233) * 43758.5453) % 1
 }
 
 export function terrainHeight(x: number, z: number) {
-  const ridge = Math.max(0, Math.abs(x) - 16) * 0.55
+  const lat = pathLateral(x, z)
+  const ridge = Math.max(0, Math.abs(lat) - 16) * 0.55
   const hills = Math.sin(z * 0.07) * 1.4 + Math.sin(x * 0.2 + z * 0.05) * 1.1
   const mtn = ridge > 0 ? ridge + n2(x, z) * 3 : 0
   return Math.max(0, Math.round(hills + mtn))
@@ -20,14 +25,15 @@ export function terrainHeight(x: number, z: number) {
 /** Canopy tops matching tree placement in `build` — for ambient bird perches. */
 export function treePerches(): { x: number; y: number; z: number }[] {
   const out: { x: number; y: number; z: number }[] = []
-  for (let z = -20; z < LEN; z++) {
-    for (let x = -W; x <= W; x++) {
+  for (let z = ROUTE_Z_MIN; z < ROUTE_Z_MAX; z++) {
+    for (let x = ROUTE_X_MIN; x <= ROUTE_X_MAX; x++) {
       if (isRiver(x, z)) continue
-      const bank = Math.abs(x - riverX(z))
-      if (bank < 2.7 && bank >= 1.6 && Math.abs(x) < 14) continue
+      const lat = pathLateral(x, z)
+      const bank = Math.abs(lat - riverLat(z))
+      if (bank < 2.7 && bank >= 1.6 && Math.abs(lat) < 14) continue
       const h = terrainHeight(x, z)
       const top = h >= 9 ? 'snow' : h >= 6 ? 'stone' : 'grass'
-      if (top === 'grass' && h <= 3 && Math.abs(x) > 3) {
+      if (top === 'grass' && h <= 3 && Math.abs(lat) > 3) {
         const t = n2(x * 3, z * 3)
         if (t > 0.984) {
           const th = 3 + Math.floor(n2(z, x) * 2)
@@ -45,12 +51,13 @@ export function treePerches(): { x: number; y: number; z: number }[] {
   return out
 }
 
-function riverX(z: number) {
-  return Math.sin(z * 0.045) * 7
+function riverLat(z: number) {
+  return Math.sin(z * 0.045) * 2
 }
 
 function isRiver(x: number, z: number) {
-  return Math.abs(x - riverX(z)) < 1.6 && Math.abs(x) < 14
+  const lat = pathLateral(x, z)
+  return Math.abs(lat - riverLat(z)) < 1.6 && Math.abs(lat) < 14
 }
 
 type Bucket = {
@@ -135,17 +142,18 @@ function build(): Bucket[] {
     }
   }
 
-  for (let z = -20; z < LEN; z++) {
-    for (let x = -W; x <= W; x++) {
+  for (let z = ROUTE_Z_MIN; z < ROUTE_Z_MAX; z++) {
+    for (let x = ROUTE_X_MIN; x <= ROUTE_X_MAX; x++) {
       const r = n2(x, z)
+      const lat = pathLateral(x, z)
       if (isRiver(x, z)) {
         push(B.water, x, 0, z)
         if (r > 0.82) push(B.lily, x, 0.58, z)
         continue
       }
 
-      const bank = Math.abs(x - riverX(z))
-      if (bank < 2.7 && bank >= 1.6 && Math.abs(x) < 14) {
+      const bank = Math.abs(lat - riverLat(z))
+      if (bank < 2.7 && bank >= 1.6 && Math.abs(lat) < 14) {
         push(r > 0.5 ? B.sand : B.gravel, x, 0, z)
         if (r > 0.72) push(B.reed, x, 1.2, z)
         continue
@@ -161,7 +169,7 @@ function build(): Bucket[] {
       if (h > 0) push(h >= 6 ? B.stone : B.dirt, x, h - 1, z)
       if (h > 1 && top !== 'snow') push(B.dirt, x, h - 2, z)
 
-      if (top === 'grass' && h <= 3 && Math.abs(x) > 3) {
+      if (top === 'grass' && h <= 3 && Math.abs(lat) > 3) {
         const t = n2(x * 3, z * 3)
         if (t > 0.984) oak(x, h, z)
         else if (t > 0.972) birchTree(x, h, z)
@@ -181,7 +189,7 @@ function build(): Bucket[] {
 
   for (let i = 0; i < 28; i++) {
     const cz = 20 + i * 28 + n2(i, 2) * 10
-    const cx = (n2(i, 9) - 0.5) * 50
+    const cx = pathX(cz) + (n2(i, 9) - 0.5) * 50
     const cy = 26 + n2(i, 4) * 8
     const s = 2 + Math.floor(n2(i, 7) * 3)
     for (let x = -s; x <= s; x++) {
