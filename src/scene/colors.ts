@@ -32,7 +32,7 @@ export const C = {
   shirt: '#3d5a9a',
   pants: '#3a4a2a',
   snappy: '#7ec8f0',
-  snappyBelly: '#b8e4f6',
+  snappyBelly: '#7ec8f0',
   snappyEar: '#f0b429',
   snappyFace: '#1a1a1a',
 }

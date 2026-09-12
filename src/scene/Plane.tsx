@@ -27,12 +27,12 @@ function Snappy() {
       <Voxel p={[0, 0.22, 0]} s={[0.54, 0.4, 0.46]} kind="snappy" />
       <Voxel p={[0, 0.4, 0]} s={[0.42, 0.28, 0.38]} kind="snappy" />
       <Voxel p={[0, 0.05, 0]} s={[0.44, 0.24, 0.4]} kind="snappy" />
-      <Voxel p={[0, 0.2, 0.2]} s={[0.32, 0.3, 0.1]} kind="snappyBelly" />
+      <Voxel p={[0, 0.2, 0.2]} s={[0.32, 0.3, 0.1]} kind="snappy" />
       <Voxel p={[-0.1, 0.4, 0.2]} s={[0.07, 0.07, 0.05]} kind="snappyFace" />
       <Voxel p={[0.1, 0.4, 0.2]} s={[0.07, 0.07, 0.05]} kind="snappyFace" />
-      <Voxel p={[-0.06, 0.32, 0.2]} s={[0.05, 0.03, 0.04]} kind="snappyFace" />
-      <Voxel p={[0, 0.31, 0.2]} s={[0.06, 0.03, 0.04]} kind="snappyFace" />
-      <Voxel p={[0.06, 0.32, 0.2]} s={[0.05, 0.03, 0.04]} kind="snappyFace" />
+      <Voxel p={[-0.05, 0.325, 0.26]} s={[0.04, 0.03, 0.04]} kind="snappyFace" />
+      <Voxel p={[0, 0.31, 0.26]} s={[0.05, 0.03, 0.04]} kind="snappyFace" />
+      <Voxel p={[0.05, 0.325, 0.26]} s={[0.04, 0.03, 0.04]} kind="snappyFace" />
       <Voxel p={[-0.08, 0.58, 0]} s={[0.07, 0.1, 0.07]} kind="snappy" />
       <Voxel p={[0, 0.62, 0]} s={[0.08, 0.12, 0.08]} kind="snappy" />
       <Voxel p={[0.08, 0.58, 0]} s={[0.07, 0.1, 0.07]} kind="snappy" />

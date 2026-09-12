@@ -229,7 +229,7 @@ const paints: Record<string, (set: (x: number, y: number, hex: string) => void) 
   pants: (set) => wool(set, '#3a4a2a', '#2a381c', 49),
   hat: (set) => wool(set, '#3a2e22', '#2a2218', 50),
   snappy: (set) => wool(set, '#7ec8f0', '#6ab4e0', 51),
-  snappyBelly: (set) => wool(set, '#b8e4f6', '#9ed4ee', 52),
+  snappyBelly: (set) => wool(set, '#7ec8f0', '#6ab4e0', 52),
   snappyEar: (set) => wool(set, '#f0b429', '#e09820', 53),
   snappyFace: (set) => wool(set, '#1a1a1a', '#0a0a0a', 54),
 }
