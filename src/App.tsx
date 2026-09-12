@@ -1,8 +1,17 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AssistOverlay } from './AssistOverlay'
-import { Hud, TitleScreen } from './Hud'
+import { Hud, SoundDock, TitleScreen } from './Hud'
 import { World } from './scene/World'
 import type { TurnDirection } from './scene/Flight'
+import {
+  playHopWhoosh,
+  playStartBlip,
+  readMuted,
+  readVolume,
+  setVolume,
+  toggleMuted,
+  unlockAudio,
+} from './scene/FlightAudio'
 import { SLIDES } from './slides'
 import { usePresentationSync } from './presentationSync'
 import './index.css'
@@ -23,6 +32,8 @@ export default function App() {
   const [turnDirection, setTurnDirection] = useState<TurnDirection>(0)
   const [facing, setFacing] = useState<1 | -1>(1)
   const [slideHidden, setSlideHidden] = useState(false)
+  const [muted, setMuted] = useState(readMuted)
+  const [volume, setVol] = useState(readVolume)
   const upTarget = index + facing
   const downTarget = index - facing
 
@@ -32,6 +43,8 @@ export default function App() {
 
   const go = useCallback((next: number, turn: TurnDirection = 0) => {
     if (next < 0 || next >= SLIDES.length) return
+    unlockAudio()
+    playHopWhoosh()
     setFlying(true)
     setApproaching(false)
     setTurnDirection(turn)
@@ -40,6 +53,13 @@ export default function App() {
     setBackIndex(index)
     setIndex(next)
   }, [facing, index])
+
+  const startTalk = useCallback(() => {
+    unlockAudio()
+    playStartBlip()
+    playHopWhoosh()
+    setStarted(true)
+  }, [])
 
   usePresentationSync(index, (next) => {
     setStarted(true)
@@ -51,6 +71,11 @@ export default function App() {
     go(backIndex, turn)
   }, [backIndex, go])
 
+  const flipMute = useCallback(() => {
+    if (started) unlockAudio()
+    setMuted(toggleMuted())
+  }, [started])
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const typing =
@@ -58,7 +83,7 @@ export default function App() {
         !!e.target.closest('input, textarea, select, [contenteditable="true"]')
       if (e.code === 'Space' || e.code === 'ArrowUp') {
         e.preventDefault()
-        if (!started) setStarted(true)
+        if (!started) startTalk()
         else go(upTarget)
       }
       if (e.code === 'ArrowDown') {
@@ -76,10 +101,15 @@ export default function App() {
         e.preventDefault()
         setSlideHidden((hidden) => !hidden)
       }
+      if (e.code === 'KeyM') {
+        if (typing) return
+        e.preventDefault()
+        flipMute()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [started, upTarget, downTarget, go, turnBack])
+  }, [started, upTarget, downTarget, go, turnBack, startTalk, flipMute])
 
   return (
     <div className="app">
@@ -101,6 +131,7 @@ export default function App() {
         <>
           <Hud
             index={index}
+            muted={muted}
             canTurnBack={backIndex !== null}
             upTarget={upTarget}
             downTarget={downTarget}
@@ -112,8 +143,18 @@ export default function App() {
           <AssistOverlay index={index} />
         </>
       ) : (
-        <TitleScreen onStart={() => setStarted(true)} />
+        <TitleScreen onStart={startTalk} />
       )}
+      <SoundDock
+        muted={muted}
+        volume={volume}
+        onMute={flipMute}
+        onVolume={(next) => {
+          if (started) unlockAudio()
+          setVolume(next)
+          setVol(next)
+        }}
+      />
     </div>
   )
 }

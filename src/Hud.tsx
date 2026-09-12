@@ -2,6 +2,7 @@ import { SLIDES } from './slides'
 
 export function Hud({
   index,
+  muted,
   canTurnBack,
   upTarget,
   downTarget,
@@ -11,6 +12,7 @@ export function Hud({
   onTurnRight,
 }: {
   index: number
+  muted: boolean
   canTurnBack: boolean
   upTarget: number
   downTarget: number
@@ -27,7 +29,7 @@ export function Hud({
           HARNESS FLIGHT
         </div>
         <div className="clock">
-          WAYPOINT {index + 1}/{SLIDES.length}
+          {muted ? 'MUTED · ' : ''}WAYPOINT {index + 1}/{SLIDES.length}
         </div>
       </header>
 
@@ -113,6 +115,41 @@ function FlightPad({
   )
 }
 
+export function SoundDock({
+  muted,
+  volume,
+  onMute,
+  onVolume,
+}: {
+  muted: boolean
+  volume: number
+  onMute: () => void
+  onVolume: (volume: number) => void
+}) {
+  return (
+    <div className="sound-dock chrome" onPointerUp={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        className={muted ? 'muted' : undefined}
+        aria-pressed={muted}
+        aria-label={muted ? 'Unmute' : 'Mute'}
+        onClick={onMute}
+      >
+        {muted ? 'MUTED' : 'MUTE'}
+      </button>
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.01}
+        value={volume}
+        aria-label="Volume"
+        onChange={(e) => onVolume(Number(e.target.value))}
+      />
+    </div>
+  )
+}
+
 export function TitleScreen({ onStart }: { onStart: () => void }) {
   return (
     <div className="title-screen" onPointerUp={(e) => e.button === 0 && onStart()}>
@@ -127,7 +164,7 @@ export function TitleScreen({ onStart }: { onStart: () => void }) {
       </p>
       <FlightPad upDisabled downDisabled turnDisabled />
       <p className="hint">Tap / Space / ↑ start · ↑/↓ paginate · ←/→ U-turn and reverse</p>
-      <p className="shortcuts">N — speaker notes<br />H — hide/show slide</p>
+      <p className="shortcuts">N — speaker notes<br />H — hide/show slide<br />M — mute</p>
     </div>
   )
 }

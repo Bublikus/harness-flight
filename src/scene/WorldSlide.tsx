@@ -5,6 +5,7 @@ import { getSlideArt } from '../SlideArt'
 import { SLIDES, type Slide } from '../slides'
 import { waypointPos } from './Beacons'
 import { blockMaterials } from './blockTextures'
+import { playRiseWhoosh } from './FlightAudio'
 import { slidePose } from './worldPoses'
 
 const WIDTH = 16
@@ -165,6 +166,7 @@ function WorldSlideCard({
   const scale = useRef(1)
   const fitAt = useRef(new THREE.Vector3())
   const side = useRef<1 | -1>(Math.random() < 0.5 ? 1 : -1)
+  const rising = useRef(false)
   const { gl, viewport } = useThree()
   const slide = SLIDES[index]
   const pose = useMemo(() => routePose(index, facing), [index, facing])
@@ -199,6 +201,8 @@ function WorldSlideCard({
     if (!card) return
     const target = raised ? 1 : 0
     if (active) slidePose.index = index
+    if (raised && !rising.current) playRiseWhoosh()
+    rising.current = raised
     if (
       !target &&
       Math.abs(rise.current) < 0.002 &&

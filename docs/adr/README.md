@@ -27,6 +27,7 @@ Index of lasting presentation choices. Procedure: `adr` skill.
 | [0021](0021-one-flyby-per-slide-session.md) | One corridor flyby per slide session | Accepted |
 | [0022](0022-presenter-h-toggle-slide.md) | Presenter H-toggle for the current slide | Accepted |
 | [0023](0023-soft-y-gradient-sky.md) | Soft Y-gradient sky dome | Accepted |
+| [0024](0024-web-audio-procedural-sfx.md) | Web Audio procedural SFX | Accepted |
 
 Restore a talk version with `git log --oneline` then `git checkout <commit>`:
 

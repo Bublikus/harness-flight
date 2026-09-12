@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { Plane } from './Plane'
 import { waypointPos } from './Beacons'
+import { setFlightMix } from './FlightAudio'
 import { planePose } from './worldPoses'
 
 export type TurnDirection = -1 | 0 | 1
@@ -11,7 +12,6 @@ const tmp = new THREE.Vector3()
 const look = new THREE.Vector3()
 const behind = new THREE.Vector3()
 const dest = new THREE.Vector3()
-
 const CRUISE = 26
 const YAW_RATE = 3.3
 const SLOWDOWN_RADIUS = 28
@@ -29,6 +29,201 @@ function wrapPi(a: number) {
   while (a > Math.PI) a -= TWO_PI
   while (a < -Math.PI) a += TWO_PI
   return a
+}
+
+const WIND_COUNT = 6
+const WIND_PTS = 28
+const WIND_RANGE = 12
+const WIND_SEGS = WIND_PTS - 1
+
+function placeMote(
+  p: THREE.Vector3,
+  origin: THREE.Vector3,
+  yaw: number,
+  along: number,
+  lat: number,
+  y: number,
+) {
+  const s = Math.sin(yaw)
+  const c = Math.cos(yaw)
+  p.set(origin.x + s * along + c * lat, origin.y + y, origin.z + c * along - s * lat)
+}
+
+type Streak = {
+  p: THREE.Vector3
+  hist: Float32Array
+  n: number
+  age: number
+  life: number
+  spd: number
+  phase: number
+  wob: number
+}
+
+function recycle(m: Streak, origin: THREE.Vector3, yaw: number, ahead: boolean) {
+  const side = Math.random() < 0.5 ? -1 : 1
+  placeMote(
+    m.p,
+    origin,
+    yaw,
+    ahead ? 2 + Math.random() * 8 : -6.5 + Math.random() * 10,
+    side * (2.6 + Math.random() * 4.8),
+    2 + Math.random() * 3.4,
+  )
+  m.age = ahead ? 0 : Math.random() * 0.45
+  m.life = 1.2 + Math.random() * 1.4
+  m.spd = 0.65 + Math.random() * 1.05
+  m.phase = Math.random() * TWO_PI
+  m.wob = 0.45 + Math.random() * 0.9
+  const x = m.p.x - origin.x
+  const y = m.p.y - origin.y
+  const z = m.p.z - origin.z
+  for (let i = 0; i < WIND_PTS; i++) {
+    m.hist[i * 3] = x
+    m.hist[i * 3 + 1] = y
+    m.hist[i * 3 + 2] = z
+  }
+  m.n = 1
+}
+
+function seedStreaks(): Streak[] {
+  return Array.from({ length: WIND_COUNT }, () => ({
+    p: new THREE.Vector3(),
+    hist: new Float32Array(WIND_PTS * 3),
+    n: 0,
+    age: 0,
+    life: 1,
+    spd: 1,
+    phase: Math.random() * TWO_PI,
+    wob: 0.6,
+  }))
+}
+
+function scatter(streaks: Streak[], origin: THREE.Vector3, yaw: number, ahead: boolean) {
+  for (const m of streaks) recycle(m, origin, yaw, ahead)
+}
+
+/** Sparse curved wind streaks — visible only while cruising. */
+function WindMotes({
+  vis,
+  yaw,
+}: {
+  vis: RefObject<number>
+  yaw: RefObject<number>
+}) {
+  const streaks = useMemo(seedStreaks, [])
+  const geo = useMemo(() => {
+    const n = WIND_COUNT * WIND_SEGS * 2
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3))
+    g.setAttribute('alpha', new THREE.BufferAttribute(new Float32Array(n), 1))
+    return g
+  }, [])
+  const mat = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        uniforms: { opacity: { value: 0 } },
+        vertexShader: /* glsl */ `
+          attribute float alpha;
+          varying float vAlpha;
+          void main() {
+            vAlpha = alpha;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: /* glsl */ `
+          uniform float opacity;
+          varying float vAlpha;
+          void main() {
+            gl_FragColor = vec4(1.0, 1.0, 1.0, opacity * vAlpha);
+            #include <tonemapping_fragment>
+            #include <colorspace_fragment>
+          }
+        `,
+      }),
+    [],
+  )
+  const seeded = useRef(false)
+  const lastVis = useRef(0)
+
+  useFrame((state, dt) => {
+    if (!planePose.valid) return
+    const d = Math.min(dt, 0.05)
+    const v = vis.current
+    const fadeIn = lastVis.current < 0.02 && v >= 0.02
+    const idle = v < 0.01 && lastVis.current < 0.01
+    lastVis.current = v
+    mat.uniforms.opacity.value = Math.min(1, v * 0.84)
+    if (idle) return
+
+    const origin = planePose.pos
+    const y = yaw.current
+    if (!seeded.current || fadeIn) {
+      scatter(streaks, origin, y, false)
+      seeded.current = true
+    }
+
+    const t = state.clock.elapsedTime
+    const gust = Math.pow(0.5 + 0.5 * Math.sin(t * 0.29) * Math.sin(t * 0.67 + 1.4), 3)
+    const wx = -1.7 + Math.sin(t * 0.23) * 0.85 + Math.sin(t * 0.47 + 0.6) * 0.4
+    const wy = -0.22 + Math.sin(t * 0.31 + 0.8) * 0.2
+    const wz = 0.65 + Math.sin(t * 0.17 + 1.2) * 0.75
+    const rangeSq = WIND_RANGE * WIND_RANGE
+    const arr = (geo.attributes.position as THREE.BufferAttribute).array as Float32Array
+    const alp = (geo.attributes.alpha as THREE.BufferAttribute).array as Float32Array
+    const ox = origin.x
+    const oy = origin.y
+    const oz = origin.z
+    let wri = 0
+    let ari = 0
+
+    for (const m of streaks) {
+      const w = t * (1.15 + m.spd * 0.85) + m.phase
+      const amp = m.wob * (2.8 + 4.2 * gust)
+      m.p.x += (wx + Math.sin(w) * amp) * m.spd * d
+      m.p.y += (wy + Math.sin(w * 1.32 + 0.5) * amp * 0.42) * m.spd * d
+      m.p.z += (wz + Math.cos(w * 0.9) * amp) * m.spd * d
+      m.age += d
+      if (m.age > m.life || m.p.distanceToSquared(origin) > rangeSq) {
+        recycle(m, origin, y, true)
+      } else {
+        for (let i = WIND_PTS - 1; i > 0; i--) {
+          const a = i * 3
+          const b = a - 3
+          m.hist[a] = m.hist[b]
+          m.hist[a + 1] = m.hist[b + 1]
+          m.hist[a + 2] = m.hist[b + 2]
+        }
+        m.hist[0] = m.p.x - ox
+        m.hist[1] = m.p.y - oy
+        m.hist[2] = m.p.z - oz
+        if (m.n < WIND_PTS) m.n++
+      }
+
+      for (let k = 0; k < WIND_SEGS; k++) {
+        const i0 = k + 1 < m.n ? k : Math.max(0, m.n - 1)
+        const i1 = k + 1 < m.n ? k + 1 : Math.max(0, m.n - 1)
+        const fade0 = 1 - i0 / WIND_SEGS
+        const fade1 = 1 - i1 / WIND_SEGS
+        arr[wri++] = ox + m.hist[i0 * 3]
+        arr[wri++] = oy + m.hist[i0 * 3 + 1]
+        arr[wri++] = oz + m.hist[i0 * 3 + 2]
+        arr[wri++] = ox + m.hist[i1 * 3]
+        arr[wri++] = oy + m.hist[i1 * 3 + 1]
+        arr[wri++] = oz + m.hist[i1 * 3 + 2]
+        alp[ari++] = fade0
+        alp[ari++] = fade1
+      }
+    }
+    geo.attributes.position.needsUpdate = true
+    geo.attributes.alpha.needsUpdate = true
+  })
+
+  return (
+    <lineSegments geometry={geo} material={mat} frustumCulled={false} />
+  )
 }
 
 export function Flight({
@@ -57,6 +252,7 @@ export function Flight({
   const bankZ = useRef(0)
   const pitchX = useRef(0)
   const windPhase = useRef(Math.random() * TWO_PI)
+  const windVis = useRef(0)
   const orbitTarget = useRef({ x: 0, y: 0 })
   const orbit = useRef({ x: 0, y: 0 })
 
@@ -202,6 +398,15 @@ export function Flight({
         windAmp *
         (0.28 + 0.12 * gustPulse)
 
+    // Cruise-only air motes: fade through the slowdown, gone at capture/park.
+    const cruise =
+      flying
+        ? THREE.MathUtils.smoothstep(dist, ARRIVAL_RADIUS, SLOWDOWN_RADIUS) *
+          THREE.MathUtils.smoothstep(speed.current, 3.5, 16)
+        : 0
+    windVis.current += (cruise - windVis.current) * (1 - Math.exp(-d * 3.6))
+    setFlightMix(flying, windVis.current)
+
     planePose.pos.copy(g.position)
     planePose.valid = true
 
@@ -224,8 +429,11 @@ export function Flight({
   })
 
   return (
-    <group ref={group} position={waypointPos(0)}>
-      <Plane />
-    </group>
+    <>
+      <group ref={group} position={waypointPos(0)}>
+        <Plane />
+      </group>
+      <WindMotes vis={windVis} yaw={yaw} />
+    </>
   )
 }

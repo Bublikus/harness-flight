@@ -241,3 +241,41 @@ button:active:not(:disabled) {
   color: #d4e6f4;
   opacity: 0.38;
 }
+
+.sound-dock {
+  pointer-events: auto;
+  position: absolute;
+  right: 22px;
+  bottom: 16px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 6px;
+  border: 3px solid var(--oak-dark);
+  background: linear-gradient(#6a4424, var(--oak-dark));
+  box-shadow: 0 4px 0 #1b140c;
+}
+
+.sound-dock button {
+  padding: 8px 7px;
+  font-size: 7px;
+  min-width: 54px;
+  background: var(--paper);
+}
+
+.sound-dock button.muted {
+  background: var(--gold);
+}
+
+.sound-dock input[type='range'] {
+  width: 88px;
+  accent-color: var(--gold);
+  cursor: pointer;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .sound-dock {
+    bottom: 100px;
+  }
+}
