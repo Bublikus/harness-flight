@@ -45,7 +45,7 @@ const CAM_HEIGHT = 4.8
 /** Finale glance: lift look-at over the plane (~15% of the old sky-stare). */
 const FINALE_LOOK_LIFT = 6
 /** Finale settle: drop chase height a little (same skyBlend as the glance). */
-const FINALE_CAM_DIP = 0.8
+const FINALE_CAM_DIP = 1.6
 /** Base chase catch-up; drops while accelerating so the plane pulls ahead. */
 const CAM_FOLLOW = 4.2
 const CAM_FOLLOW_ACCEL = 1.55

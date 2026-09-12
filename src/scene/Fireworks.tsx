@@ -2,7 +2,10 @@ import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { isMobileWorld } from './device'
-import { FINALE_SKY } from './route'
+import { FINALE_SKY, ROUTE_END } from './route'
+
+/** Compensates FINALE_SKY along 36→80 so finale cam still sees big cubes. */
+const DIST = 80 / 36
 
 /** Grass, gold HUD, glowstone, wood, water, sky, plane red, HUD lilac, snow, pumpkin. */
 const PALETTE = [
@@ -85,12 +88,12 @@ function emit(
   s.x = x
   s.y = y
   s.z = z
-  s.vx = vx
-  s.vy = vy
-  s.vz = vz
+  s.vx = vx * DIST
+  s.vy = vy * DIST
+  s.vz = vz * DIST
   s.life = life
   s.max = life
-  s.size = size
+  s.size = size * DIST
   s.rocket = false
   s.spin = spin
   s.stretch = 1
@@ -203,17 +206,23 @@ function explode(pool: Spark[], x: number, y: number, z: number, n: number) {
 function launch(pool: Spark[]) {
   const s = take(pool)
   if (!s) return
-  const a = Math.random() * Math.PI * 2
-  const rad = 3 + Math.random() * 14
-  s.x = FINALE_SKY.x + Math.cos(a) * rad
-  s.z = FINALE_SKY.z + Math.sin(a) * rad
-  s.y = FINALE_SKY.y - 18 - Math.random() * 12
-  s.vx = (Math.random() - 0.5) * 2.2
-  s.vy = 16 + Math.random() * 11
-  s.vz = (Math.random() - 0.5) * 2.2
-  s.life = 0.5 + Math.random() * 0.5
+  // Ellipse: wide across landscape, shallow along-track so near edge stays past rim.
+  const across = (Math.random() - 0.5) * 100
+  const along = (Math.random() - 0.5) * 12
+  const yaw = ROUTE_END.yaw
+  const life = 0.5 + Math.random() * 0.5
+  const vy = (16 + Math.random() * 11) * DIST
+  const T = vy * life
+  s.x = FINALE_SKY.x + Math.sin(yaw) * along + Math.cos(yaw) * across
+  s.z = FINALE_SKY.z + Math.cos(yaw) * along - Math.sin(yaw) * across
+  // Spawn 2×T below burst (was ~1×T); double vy so apex stays put.
+  s.y = FINALE_SKY.y - 18 - Math.random() * 12 - T
+  s.vx = (Math.random() - 0.5) * 2.2 * DIST
+  s.vy = vy * 2
+  s.vz = (Math.random() - 0.5) * 2.2 * DIST
+  s.life = life
   s.max = s.life
-  s.size = 1.15
+  s.size = 1.15 * DIST
   s.rocket = true
   s.spin = 0
   s.stretch = 2.8
@@ -286,12 +295,12 @@ export function Fireworks({ active }: { active: boolean }) {
           crumb.x = s.x
           crumb.y = s.y
           crumb.z = s.z
-          crumb.vx = (Math.random() - 0.5) * 0.8
-          crumb.vy = -1.2
-          crumb.vz = (Math.random() - 0.5) * 0.8
+          crumb.vx = (Math.random() - 0.5) * 0.8 * DIST
+          crumb.vy = -1.2 * DIST
+          crumb.vz = (Math.random() - 0.5) * 0.8 * DIST
           crumb.life = 0.22 + Math.random() * 0.2
           crumb.max = crumb.life
-          crumb.size = 0.85
+          crumb.size = 0.85 * DIST
           crumb.rocket = false
           crumb.spin = 0
           crumb.stretch = 1
