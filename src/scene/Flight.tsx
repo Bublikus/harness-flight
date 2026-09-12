@@ -609,6 +609,7 @@ export function Flight({
 
     planePose.pos.copy(g.position)
     planePose.speed = speed.current
+    planePose.yaw = yaw.current
     planePose.valid = true
 
     // Positive speed ramp drives chase lag + fisheye FOV; decays when cruising/landing.

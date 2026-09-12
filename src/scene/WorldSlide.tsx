@@ -7,7 +7,7 @@ import { waypointPose } from './route'
 import { blockMaterials } from './blockTextures'
 import { playRiseWhoosh } from './FlightAudio'
 import { terrainHeight } from './Terrain'
-import { slidePose } from './worldPoses'
+import { planePose, slidePose } from './worldPoses'
 
 const WIDTH = 16
 const HEIGHT = 7.5
@@ -135,8 +135,27 @@ function routePose(index: number, facing: 1 | -1) {
   }
 }
 
+function wrapPi(a: number) {
+  while (a > Math.PI) a -= Math.PI * 2
+  while (a < -Math.PI) a += Math.PI * 2
+  return a
+}
+
+/** Hop travel while the plane is still turning; parked yaw if it already disagrees. */
+function arrivalFacing(index: number, travel: 1 | -1, flying: boolean): 1 | -1 {
+  if (flying || !planePose.valid) return travel
+  const yaw = waypointPose(index).yaw
+  const toFwd = Math.abs(wrapPi(planePose.yaw - yaw))
+  const toBack = Math.abs(wrapPi(planePose.yaw - yaw - Math.PI))
+  return toFwd <= toBack ? 1 : -1
+}
+
 function boardId(index: number) {
   return SLIDES[index].id
+}
+
+function cardKey(index: number, facing: 1 | -1) {
+  return `${boardId(index)}:${facing}`
 }
 
 function WorldSlideCard({
@@ -145,6 +164,7 @@ function WorldSlideCard({
   flying,
   approaching,
   facing,
+  travelFacing,
   hidden,
   active,
   onExited,
@@ -154,6 +174,7 @@ function WorldSlideCard({
   flying: boolean
   approaching: boolean
   facing: 1 | -1
+  travelFacing: 1 | -1
   hidden: boolean
   active: boolean
   onExited: () => void
@@ -165,6 +186,7 @@ function WorldSlideCard({
   const fitAt = useRef(new THREE.Vector3())
   const side = useRef<1 | -1>(Math.random() < 0.5 ? 1 : -1)
   const rising = useRef(false)
+  const displayFacing = useRef(facing)
   /** One disappear whoosh per lower (foliage contact). */
   const contactSfx = useRef(false)
   const prevBottom = useRef(Number.POSITIVE_INFINITY)
@@ -203,10 +225,12 @@ function WorldSlideCard({
     const target = raised ? 1 : 0
     if (active) slidePose.index = index
     if (raised && !rising.current) {
+      displayFacing.current = arrivalFacing(index, travelFacing, flying)
       playRiseWhoosh()
       contactSfx.current = false
     }
     rising.current = raised
+    const pose = routePose(index, displayFacing.current)
     if (
       !target &&
       Math.abs(rise.current) < 0.002 &&
@@ -324,35 +348,33 @@ export function WorldSlide({
     current,
     cards: [{ index, facing }],
   }))
-  if (state.current !== current)
+  const hasFace = state.cards.some(
+    (card) => boardId(card.index) === current && card.facing === facing,
+  )
+  if (state.current !== current || !hasFace)
     setState({
       current,
-      cards: state.cards.some((card) => boardId(card.index) === current)
-        ? state.cards
-        : [...state.cards, { index, facing }],
+      cards: hasFace ? state.cards : [...state.cards, { index, facing }],
     })
 
   const remove = useCallback((exited: string) => {
-    setState((state) =>
-      exited === state.current
-        ? state
-        : {
-            ...state,
-            cards: state.cards.filter((card) => boardId(card.index) !== exited),
-          },
-    )
+    setState((state) => ({
+      ...state,
+      cards: state.cards.filter((card) => cardKey(card.index, card.facing) !== exited),
+    }))
   }, [])
 
   return state.cards.map((card) => (
     <WorldSlideCard
-      key={boardId(card.index)}
+      key={cardKey(card.index, card.facing)}
       {...card}
+      travelFacing={facing}
       started={started}
       flying={flying}
       approaching={approaching}
       hidden={hidden}
-      active={boardId(card.index) === current}
-      onExited={() => remove(boardId(card.index))}
+      active={boardId(card.index) === current && card.facing === facing}
+      onExited={() => remove(cardKey(card.index, card.facing))}
     />
   ))
 }

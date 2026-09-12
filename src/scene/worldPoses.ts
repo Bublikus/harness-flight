@@ -5,6 +5,8 @@ export const planePose = {
   pos: new THREE.Vector3(),
   /** World units/s; desktop motion blur scales from this. */
   speed: 0,
+  /** Heading, same convention as waypoint yaw (atan2(x, z)). */
+  yaw: 0,
   valid: false,
 }
 
