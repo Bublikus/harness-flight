@@ -124,6 +124,7 @@ export function World({
   finale,
   slideHidden,
   turnDirection,
+  motionBlur,
   onApproach,
   onArrived,
 }: {
@@ -135,6 +136,7 @@ export function World({
   finale: boolean
   slideHidden: boolean
   turnDirection: TurnDirection
+  motionBlur: boolean
   onApproach: () => void
   onArrived: () => void
 }) {
@@ -173,7 +175,7 @@ export function World({
         onArrived={onArrived}
       />
       {/* Desktop only — EffectComposer never mounts (or loads) on mobile. */}
-      {!mobile && (
+      {!mobile && motionBlur && (
         <Suspense fallback={null}>
           <SpeedMotionBlur />
         </Suspense>

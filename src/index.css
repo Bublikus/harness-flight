@@ -262,19 +262,29 @@ button.dot.sky.on {
   opacity: 0.38;
 }
 
-.sound-dock {
-  pointer-events: auto;
+.corner-docks {
+  pointer-events: none;
   position: absolute;
   right: 22px;
   bottom: 16px;
   z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.sound-dock,
+.settings-dock {
+  pointer-events: auto;
+  position: relative;
   display: flex;
   flex-direction: column-reverse;
   align-items: center;
   gap: 6px;
 }
 
-.sound-dock button {
+.sound-dock > button,
+.settings-dock > button {
   width: 44px;
   height: 44px;
   min-width: 44px;
@@ -285,7 +295,7 @@ button.dot.sky.on {
   color: var(--ink);
 }
 
-.sound-dock button.muted {
+.sound-dock > button.muted {
   background: var(--gold);
 }
 
@@ -319,6 +329,67 @@ button.dot.sky.on {
   margin: 0;
   accent-color: var(--gold);
   cursor: pointer;
+}
+
+.settings-dock-pop {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  min-width: 196px;
+  padding: 10px 10px 8px;
+  border: 3px solid var(--oak-dark);
+  background: linear-gradient(#6a4424, var(--oak-dark));
+  box-shadow: 0 4px 0 #1b140c;
+  color: var(--paper);
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+  transition:
+    opacity 0.14s ease,
+    transform 0.14s ease;
+}
+
+/* Bridge the 6px visual gap so :hover stays when moving onto the menu. */
+.settings-dock-pop::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 6px;
+}
+
+.settings-dock:hover .settings-dock-pop {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.settings-heading {
+  margin: 0 4px 8px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7px;
+  letter-spacing: 0.06em;
+  color: var(--gold);
+}
+
+.settings-dock-pop button {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 8px;
+  font-size: 7px;
+  line-height: 1.4;
+  text-align: left;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.settings-dock-pop button.on {
+  background: var(--gold);
 }
 
 /* Touch / no-hover: keep the vertical slider reachable without hover-reveal. */

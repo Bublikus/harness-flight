@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AssistOverlay } from './AssistOverlay'
-import { Hud, SoundDock, TitleScreen } from './Hud'
+import { Hud, SettingsDock, SoundDock, TitleScreen } from './Hud'
 import { World } from './scene/World'
 import type { TurnDirection } from './scene/Flight'
 import {
@@ -12,6 +12,7 @@ import {
   toggleMuted,
   unlockAudio,
 } from './scene/FlightAudio'
+import { readMotionBlur, writeMotionBlur } from './scene/graphicsPrefs'
 import { FINALE_PAGE, LAST_CHECKPOINT, waypointIndex } from './slides'
 import { usePresentationSync } from './presentationSync'
 import './index.css'
@@ -36,6 +37,7 @@ export default function App() {
   const [slidesHidden, setSlidesHidden] = useState(false)
   const [muted, setMuted] = useState(readMuted)
   const [volume, setVol] = useState(readVolume)
+  const [motionBlur, setMotionBlur] = useState(readMotionBlur)
   const finale = index === FINALE_PAGE
   const waypoint = waypointIndex(index)
   const upTarget = finale ? FINALE_PAGE + 1 : index + facing
@@ -144,6 +146,7 @@ export default function App() {
         finale={finale}
         slideHidden={slidesHidden || finale || pendingFinale}
         turnDirection={turnDirection}
+        motionBlur={motionBlur}
         onApproach={() => setApproaching(true)}
         onArrived={() => {
           setFlying(false)
@@ -174,16 +177,25 @@ export default function App() {
         <TitleScreen onStart={startTalk} />
       )}
       {audioEnabled() && (
-        <SoundDock
-          muted={muted}
-          volume={volume}
-          onMute={flipMute}
-          onVolume={(next) => {
-            if (started) unlockAudio()
-            setVolume(next)
-            setVol(next)
-          }}
-        />
+        <div className="corner-docks">
+          <SoundDock
+            muted={muted}
+            volume={volume}
+            onMute={flipMute}
+            onVolume={(next) => {
+              if (started) unlockAudio()
+              setVolume(next)
+              setVol(next)
+            }}
+          />
+          <SettingsDock
+            motionBlur={motionBlur}
+            onMotionBlur={(next) => {
+              writeMotionBlur(next)
+              setMotionBlur(next)
+            }}
+          />
+        </div>
       )}
     </div>
   )

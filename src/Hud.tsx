@@ -147,6 +147,17 @@ function SpeakerIcon({ off }: { off: boolean }) {
   )
 }
 
+function GearIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden>
+      <path
+        fill="currentColor"
+        d="M7 1h2v1h2V1h1v2h2v1h1v2h-1v2h1v2h-1v1h-2v2H10v1H6v-1H4v-2H3v-1H1V9h1V7H1V5h2V4h1V2h2V1h1zm1 4a3 3 0 100 6 3 3 0 000-6z"
+      />
+    </svg>
+  )
+}
+
 export function SoundDock({
   muted,
   volume,
@@ -181,6 +192,35 @@ export function SoundDock({
           aria-orientation="vertical"
           onChange={(e) => onVolume(Number(e.target.value))}
         />
+      </div>
+    </div>
+  )
+}
+
+export function SettingsDock({
+  motionBlur,
+  onMotionBlur,
+}: {
+  motionBlur: boolean
+  onMotionBlur: (on: boolean) => void
+}) {
+  return (
+    <div className="settings-dock chrome" onPointerUp={(e) => e.stopPropagation()}>
+      <button type="button" aria-haspopup="true" aria-label="Settings">
+        <GearIcon />
+      </button>
+      <div className="settings-dock-pop" role="menu" aria-label="Settings">
+        <p className="settings-heading">Graphics</p>
+        <button
+          type="button"
+          role="menuitemcheckbox"
+          aria-checked={motionBlur}
+          className={motionBlur ? 'on' : undefined}
+          onClick={() => onMotionBlur(!motionBlur)}
+        >
+          Motion blur
+          <span>{motionBlur ? 'ON' : 'OFF'}</span>
+        </button>
       </div>
     </div>
   )
