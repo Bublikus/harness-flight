@@ -30,7 +30,9 @@ function wrapPi(a: number) {
 const START_Z = 8
 const AFTER_TURN = 8
 const TAIL = 24
-const APPROACH = 20
+/** Extra Z behind start / past end for terminus hill mass (ADR-0028). */
+const APPROACH = 32
+const END_PAD = 32
 const VALLEY_W = 22
 
 function altitude(i: number) {
@@ -127,9 +129,15 @@ for (const f of FRAMES) {
 export const ROUTE_X_MIN = Math.floor(minX) - VALLEY_W
 export const ROUTE_X_MAX = Math.ceil(maxX) + VALLEY_W
 export const ROUTE_Z_MIN = -APPROACH
-export const ROUTE_Z_MAX = Math.ceil(maxZ) + 16
+export const ROUTE_Z_MAX = Math.ceil(maxZ) + END_PAD
 export const ROUTE_VALLEY = 17
 export const PATH_LENGTH = FRAMES[FRAMES.length - 1].s
+
+const first = WAYPOINTS[0]
+const lastWp = WAYPOINTS[WAYPOINTS.length - 1]
+/** First / last checkpoint poses — terminus hill anchors (ADR-0028). */
+export const ROUTE_START = { x: first.x, z: first.z, yaw: first.yaw }
+export const ROUTE_END = { x: lastWp.x, z: lastWp.z, yaw: lastWp.yaw }
 
 function frameAtZ(z: number): { x: number; yaw: number } {
   if (z <= START_Z) return { x: 0, yaw: 0 }

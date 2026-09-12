@@ -31,6 +31,7 @@ Index of lasting presentation choices. Procedure: `adr` skill.
 | [0025](0025-meandering-route.md) | Seeded meandering route as layout source | Superseded by ADR-0026 |
 | [0026](0026-path-following-hops.md) | Irregular route; hops follow the polyline | Accepted |
 | [0027](0027-last-checkpoint-finale-return.md) | Last-checkpoint about-face; finale on return | Accepted |
+| [0028](0028-terminus-mountain-framing.md) | Terminus mountain framing at start/end | Accepted |
 
 Restore a talk version with `git log --oneline` then `git checkout <commit>`:
 

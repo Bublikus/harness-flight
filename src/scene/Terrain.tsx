@@ -4,6 +4,8 @@ import { blockMaterials } from './blockTextures'
 import {
   pathLateral,
   pathX,
+  ROUTE_END,
+  ROUTE_START,
   ROUTE_X_MAX,
   ROUTE_X_MIN,
   ROUTE_Z_MAX,
@@ -14,12 +16,43 @@ function n2(x: number, z: number) {
   return Math.abs(Math.sin(x * 12.9898 + z * 78.233) * 43758.5453) % 1
 }
 
+/** Hill bowl behind start (dir=-1) or ahead of end (dir=+1); corridor stays open. */
+function terminusLift(x: number, z: number, p: { x: number; z: number; yaw: number }, dir: 1 | -1) {
+  const dx = x - p.x
+  const dz = z - p.z
+  const along = dx * Math.sin(p.yaw) + dz * Math.cos(p.yaw)
+  const across = dx * Math.cos(p.yaw) - dz * Math.sin(p.yaw)
+  // Caps keep longer end runout / angled yaw from towering past start-scale hills.
+  const out = Math.min(14, Math.max(0, along * dir - 2))
+  const side = Math.min(12, Math.max(0, Math.abs(across) - 10))
+  // Back/forward hills reach farther; side mass stays local to the terminus.
+  const alongNear = Math.exp((-along * along) / (32 * 32))
+  const sideNear = Math.exp((-along * along) / (16 * 16))
+  const h = alongNear * out * 0.55 + sideNear * side * 0.35
+  if (h < 0.4) return 0
+  return Math.min(12, h + 2.2 + n2(x + dir * 9, z) * 1.6)
+}
+
+/** Extra mass on the Z padding belts so mesh edges stay closed. */
+function padCurtain(z: number) {
+  const a = Math.max(0, ROUTE_Z_MIN + 14 - z)
+  const b = Math.max(0, z - (ROUTE_Z_MAX - 14))
+  const t = Math.max(a, b)
+  return t > 0 ? t * 0.28 + 1.8 + n2(3, z) * 0.9 : 0
+}
+
 export function terrainHeight(x: number, z: number) {
   const lat = pathLateral(x, z)
   const ridge = Math.max(0, Math.abs(lat) - 16) * 0.55
   const hills = Math.sin(z * 0.07) * 1.4 + Math.sin(x * 0.2 + z * 0.05) * 1.1
   const mtn = ridge > 0 ? ridge + n2(x, z) * 3 : 0
-  return Math.max(0, Math.round(hills + mtn))
+  const gates =
+    terminusLift(x, z, ROUTE_START, -1) +
+    terminusLift(x, z, ROUTE_END, 1) +
+    padCurtain(z)
+  // Angled end bowl sits in corridor-ridge zone — damp ridges under gates so ends match.
+  const mtnEff = gates > 0 ? mtn * Math.max(0, 1 - gates / 8) : mtn
+  return Math.max(0, Math.round(hills + mtnEff + gates))
 }
 
 /** Canopy tops matching tree placement in `build` — for ambient bird perches. */
@@ -161,13 +194,16 @@ function build(): Bucket[] {
 
       const h = terrainHeight(x, z)
       const top = h >= 9 ? 'snow' : h >= 6 ? 'stone' : 'grass'
-      if (top === 'snow') push(B.snow, x, h, z)
-      else if (top === 'stone') {
-        const ore = n2(x * 5, z * 5)
-        push(ore > 0.92 ? B.coal : ore > 0.84 ? B.iron : B.stone, x, h, z)
-      } else push(B.grass, x, h, z)
-      if (h > 0) push(h >= 6 ? B.stone : B.dirt, x, h - 1, z)
-      if (h > 1 && top !== 'snow') push(B.dirt, x, h - 2, z)
+      // Full column fill — surface-only crust left sky gaps under steep slopes.
+      for (let y = 0; y <= h; y++) {
+        if (y === h) {
+          if (top === 'snow') push(B.snow, x, y, z)
+          else if (top === 'stone') {
+            const ore = n2(x * 5, z * 5)
+            push(ore > 0.92 ? B.coal : ore > 0.84 ? B.iron : B.stone, x, y, z)
+          } else push(B.grass, x, y, z)
+        } else push(h >= 6 ? B.stone : B.dirt, x, y, z)
+      }
 
       if (top === 'grass' && h <= 3 && Math.abs(lat) > 3) {
         const t = n2(x * 3, z * 3)
