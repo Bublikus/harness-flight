@@ -972,9 +972,12 @@ export function Birds() {
         bestD = dSq
         best = i
       }
-      if (best >= 0 && playBirdChirp()) {
-        chirpAt[best] = time + CHIRP_COOLDOWN
-        nextChirpAt.current = time + CHIRP_GAP
+      if (best >= 0) {
+        const b = birds[best]
+        if (playBirdChirp({ x: b.p.x, y: b.p.y, z: b.p.z })) {
+          chirpAt[best] = time + CHIRP_COOLDOWN
+          nextChirpAt.current = time + CHIRP_GAP
+        }
       }
     }
   })

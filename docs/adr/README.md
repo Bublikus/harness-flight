@@ -40,6 +40,7 @@ Index of lasting presentation choices. Procedure: `adr` skill.
 | [0034](0034-hermite-arrival-bridge.md) | Hermite arrival bridge | Accepted |
 | [0035](0035-sharp-plane-over-motion-blur.md) | Sharp plane over desktop motion blur | Accepted |
 | [0036](0036-cyclable-camera-view-configs.md) | Cyclable camera views as smoothed config objects | Accepted |
+| [0037](0037-spatial-web-audio-world-sfx.md) | Spatial Web Audio for world SFX | Accepted |
 
 Restore a talk version with `git log --oneline` then `git checkout <commit>`:
 

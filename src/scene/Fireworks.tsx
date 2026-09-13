@@ -467,7 +467,7 @@ function launch(pool: Spark[], cheap: boolean) {
   s.tr = s.r
   s.tg = s.g
   s.tb = s.b
-  playFireworkLaunch()
+  playFireworkLaunch({ x: s.x, y: s.y, z: s.z })
 }
 
 export function Fireworks({ active }: { active: boolean }) {
@@ -526,7 +526,7 @@ export function Fireworks({ active }: { active: boolean }) {
       if (s.life <= 0) {
         if (s.rocket) {
           explode(sparks, s.x, s.y, s.z, burst, 0, mobile)
-          playFireworkBurst(false)
+          playFireworkBurst(false, { x: s.x, y: s.y, z: s.z })
           if (s.fuse === 4) {
             const shells = mobile ? 2 : 3
             for (let k = 0; k < shells; k++) {
@@ -543,7 +543,7 @@ export function Fireworks({ active }: { active: boolean }) {
           }
         } else if (s.fuse === 1) {
           explode(sparks, s.x, s.y, s.z, mobile ? 8 : 16, 1, mobile)
-          playFireworkBurst(true)
+          playFireworkBurst(true, { x: s.x, y: s.y, z: s.z })
         } else if (s.fuse === 2) {
           crackle(sparks, s.x, s.y, s.z, [s.r, s.g, s.b], mobile)
         } else if (s.fuse === 3) {

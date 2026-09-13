@@ -10,6 +10,17 @@ export const planePose = {
   valid: false,
 }
 
+/**
+ * Chase-cam pose for Web Audio `AudioListener` (Flight publishes each frame).
+ * Falls back to plane yaw+pos inside FlightAudio when not yet valid.
+ */
+export const audioListenerPose = {
+  pos: new THREE.Vector3(),
+  forward: new THREE.Vector3(0, 0, 1),
+  up: new THREE.Vector3(0, 1, 0),
+  valid: false,
+}
+
 export const slidePose = {
   pos: new THREE.Vector3(),
   /** Active waypoint index; −1 until a board publishes. Session key for flybys. */

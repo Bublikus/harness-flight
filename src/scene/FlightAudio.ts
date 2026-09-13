@@ -5,12 +5,20 @@ const VOLUME_KEY = 'harness-flight-volume'
 /** Max master gain at volume=1. ~0.85 keeps a little headroom for stacked fireworks. */
 const MASTER = 1.0
 
+/** Match bird HEAR_R (~9.2): nearby clear, farther quieter via inverse distance. */
+const REF_DISTANCE = 10
+const MAX_DISTANCE = 80
+const ROLLOFF = 1
+
 import { isMobileWorld } from './device'
+import { audioListenerPose, planePose, slidePose } from './worldPoses'
 
 /** Match HUD mobile media: no AudioContext / SFX on touch / coarse pointers. */
 export function audioEnabled() {
   return !isMobileWorld()
 }
+
+export type AudioPos = { x: number; y: number; z: number }
 
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
@@ -74,6 +82,92 @@ function live() {
   return !!ctx && ctx.state === 'running'
 }
 
+/** Push chase-cam (or plane) pose into `AudioContext.listener`. */
+export function syncAudioListener() {
+  if (!ctx || !audioEnabled()) return
+  const now = ctx.currentTime
+  const L = ctx.listener
+  let px: number
+  let py: number
+  let pz: number
+  let fx: number
+  let fy: number
+  let fz: number
+  let ux: number
+  let uy: number
+  let uz: number
+  if (audioListenerPose.valid) {
+    const p = audioListenerPose.pos
+    const f = audioListenerPose.forward
+    const u = audioListenerPose.up
+    px = p.x
+    py = p.y
+    pz = p.z
+    fx = f.x
+    fy = f.y
+    fz = f.z
+    ux = u.x
+    uy = u.y
+    uz = u.z
+  } else if (planePose.valid) {
+    const p = planePose.pos
+    px = p.x
+    py = p.y
+    pz = p.z
+    fx = Math.sin(planePose.yaw)
+    fy = 0
+    fz = Math.cos(planePose.yaw)
+    ux = 0
+    uy = 1
+    uz = 0
+  } else {
+    return
+  }
+  if (L.positionX) {
+    L.positionX.setValueAtTime(px, now)
+    L.positionY.setValueAtTime(py, now)
+    L.positionZ.setValueAtTime(pz, now)
+    L.forwardX.setValueAtTime(fx, now)
+    L.forwardY.setValueAtTime(fy, now)
+    L.forwardZ.setValueAtTime(fz, now)
+    L.upX.setValueAtTime(ux, now)
+    L.upY.setValueAtTime(uy, now)
+    L.upZ.setValueAtTime(uz, now)
+  } else {
+    L.setPosition(px, py, pz)
+    L.setOrientation(fx, fy, fz, ux, uy, uz)
+  }
+}
+
+function makePanner(pos: AudioPos): PannerNode | null {
+  if (!ctx || !master) return null
+  syncAudioListener()
+  const p = ctx.createPanner()
+  p.panningModel = 'HRTF'
+  p.distanceModel = 'inverse'
+  p.refDistance = REF_DISTANCE
+  p.maxDistance = MAX_DISTANCE
+  p.rolloffFactor = ROLLOFF
+  p.coneInnerAngle = 360
+  p.coneOuterAngle = 360
+  if (p.positionX) {
+    p.positionX.value = pos.x
+    p.positionY.value = pos.y
+    p.positionZ.value = pos.z
+  } else {
+    p.setPosition(pos.x, pos.y, pos.z)
+  }
+  p.connect(master)
+  return p
+}
+
+/** Route through a world panner when `pos` is set; otherwise straight to master. */
+function toBus(pos?: AudioPos | null): AudioNode {
+  if (!master) throw new Error('master missing')
+  if (!pos) return master
+  return makePanner(pos) ?? master
+}
+
 function noiseBuffer(c: AudioContext) {
   const buf = c.createBuffer(1, c.sampleRate * 2, c.sampleRate)
   const data = buf.getChannelData(0)
@@ -135,6 +229,7 @@ export function unlockAudio() {
     master.gain.value = readMuted() ? 0 : MASTER * readVolume()
     master.connect(ctx.destination)
     buildBeds(ctx, master)
+    syncAudioListener()
   }
   if (ctx.state === 'suspended') void ctx.resume()
 }
@@ -158,9 +253,16 @@ export function playStartBlip() {
   }
 }
 
-function playWhoosh(fromHz: number, toHz: number, attack: number, dur: number) {
+function playWhoosh(
+  fromHz: number,
+  toHz: number,
+  attack: number,
+  dur: number,
+  pos?: AudioPos | null,
+) {
   if (!live() || !master || !ctx || !noise || readMuted()) return
   const now = ctx.currentTime
+  const bus = toBus(pos)
   const src = ctx.createBufferSource()
   src.buffer = noise
   const filt = ctx.createBiquadFilter()
@@ -172,23 +274,36 @@ function playWhoosh(fromHz: number, toHz: number, attack: number, dur: number) {
   g.gain.setValueAtTime(0.0001, now)
   g.gain.exponentialRampToValueAtTime(0.14, now + attack)
   g.gain.exponentialRampToValueAtTime(0.0001, now + dur)
-  src.connect(filt).connect(g).connect(master)
+  src.connect(filt).connect(g).connect(bus)
   src.start(now)
   src.stop(now + dur + 0.02)
   src.onended = () => {
     src.disconnect()
     filt.disconnect()
     g.disconnect()
+    if (bus !== master) bus.disconnect()
   }
 }
 
-export function playHopWhoosh() {
-  playWhoosh(260, 2200, 0.028, 0.3)
+export function playHopWhoosh(pos?: AudioPos | null) {
+  const at =
+    pos ??
+    (planePose.valid
+      ? { x: planePose.pos.x, y: planePose.pos.y, z: planePose.pos.z }
+      : null)
+  playWhoosh(260, 2200, 0.028, 0.3, at)
 }
 
 /** Appear counterpart to the hop/sink whoosh — same noise, rising sweep, slower swell. */
-export function playRiseWhoosh() {
-  playWhoosh(180, 2400, 0.06, 0.38)
+export function playRiseWhoosh(pos?: AudioPos | null) {
+  const at =
+    pos ??
+    (slidePose.valid
+      ? { x: slidePose.pos.x, y: slidePose.pos.y, z: slidePose.pos.z }
+      : planePose.valid
+        ? { x: planePose.pos.x, y: planePose.pos.y, z: planePose.pos.z }
+        : null)
+  playWhoosh(180, 2400, 0.06, 0.38, at)
 }
 
 /** Cap concurrent finale fireworks one-shots so dense bursts stay under the mix. */
@@ -204,9 +319,10 @@ function fwRelease() {
 }
 
 /** Short rising whoosh when a rocket leaves the ground. */
-export function playFireworkLaunch() {
+export function playFireworkLaunch(pos?: AudioPos | null) {
   if (!fwGate() || !ctx || !master || !noise) return
   const now = ctx.currentTime
+  const bus = toBus(pos)
   const dur = 0.16 + Math.random() * 0.08
   const src = ctx.createBufferSource()
   src.buffer = noise
@@ -221,13 +337,14 @@ export function playFireworkLaunch() {
   g.gain.setValueAtTime(0.0001, now)
   g.gain.exponentialRampToValueAtTime(peak, now + 0.02)
   g.gain.exponentialRampToValueAtTime(0.0001, now + dur)
-  src.connect(filt).connect(g).connect(master)
+  src.connect(filt).connect(g).connect(bus)
   fwVoices++
   src.onended = () => {
     fwRelease()
     src.disconnect()
     filt.disconnect()
     g.disconnect()
+    if (bus !== master) bus.disconnect()
   }
   src.start(now)
   src.stop(now + dur + 0.02)
@@ -237,9 +354,10 @@ export function playFireworkLaunch() {
  * Burst boom at apex — heavy low-frequency thump like distant massive fireworks,
  * with a quieter mid crackle on top. `secondary` = delayed shells (softer boom).
  */
-export function playFireworkBurst(secondary = false) {
+export function playFireworkBurst(secondary = false, pos?: AudioPos | null) {
   if (!fwGate() || !ctx || !master || !noise) return
   const now = ctx.currentTime
+  const bus = toBus(pos)
   const scale = secondary ? 0.4 : 1
   const boomDur = (secondary ? 0.35 : 0.55) + Math.random() * 0.2
   const crackDur = (secondary ? 0.1 : 0.18) + Math.random() * 0.06
@@ -258,7 +376,7 @@ export function playFireworkBurst(secondary = false) {
   bg.gain.setValueAtTime(0.0001, now)
   bg.gain.exponentialRampToValueAtTime(bodyPeak * scale, now + 0.012)
   bg.gain.exponentialRampToValueAtTime(0.0001, now + boomDur)
-  body.connect(lp).connect(bg).connect(master)
+  body.connect(lp).connect(bg).connect(bus)
 
   // Sub thump: very low sine — felt more than heard, like a ground boom.
   const sub = ctx.createOscillator()
@@ -271,7 +389,7 @@ export function playFireworkBurst(secondary = false) {
   sg.gain.setValueAtTime(0.0001, now)
   sg.gain.exponentialRampToValueAtTime(subPeak * scale, now + 0.01)
   sg.gain.exponentialRampToValueAtTime(0.0001, now + boomDur)
-  sub.connect(sg).connect(master)
+  sub.connect(sg).connect(bus)
 
   // Soft mid crackle so bursts still read as fireworks, not only bass hits.
   const crack = ctx.createBufferSource()
@@ -287,7 +405,7 @@ export function playFireworkBurst(secondary = false) {
   cg.gain.setValueAtTime(0.0001, now)
   cg.gain.exponentialRampToValueAtTime(crackPeak, now + 0.006)
   cg.gain.exponentialRampToValueAtTime(0.0001, now + crackDur)
-  crack.connect(bp).connect(cg).connect(master)
+  crack.connect(bp).connect(cg).connect(bus)
 
   fwVoices++
   const stopAt = now + boomDur + 0.04
@@ -301,6 +419,7 @@ export function playFireworkBurst(secondary = false) {
     crack.disconnect()
     bp.disconnect()
     cg.disconnect()
+    if (bus !== master) bus.disconnect()
   }
   body.start(now)
   body.stop(stopAt)
@@ -318,13 +437,14 @@ const BIRD_MAX = 2
 let birdVoices = 0
 
 /**
- * Distant flyby chirp — triangle sweep + thin noise, then a 1.1 kHz HP / 2.6 kHz LP
- * air box so it reads far, not just quieter. Peak ~0.008 (was ~0.03).
+ * Flyby chirp at bird world position — triangle sweep + thin noise through a
+ * mild air box; inverse-distance panner handles near/far level.
  */
-export function playBirdChirp() {
+export function playBirdChirp(pos?: AudioPos | null) {
   if (!audioEnabled() || !live() || !master || !ctx || !noise || readMuted() || birdVoices >= BIRD_MAX)
     return false
   const now = ctx.currentTime
+  const bus = toBus(pos)
   const chirpDur = 0.085 + Math.random() * 0.045
   const flutterDur = 0.055 + Math.random() * 0.03
   const f0 = 1950 + Math.random() * 950
@@ -337,7 +457,7 @@ export function playBirdChirp() {
   lp.type = 'lowpass'
   lp.frequency.value = 2600
   lp.Q.value = 0.65
-  hp.connect(lp).connect(master)
+  hp.connect(lp).connect(bus)
 
   const o = ctx.createOscillator()
   o.type = 'triangle'
@@ -372,6 +492,7 @@ export function playBirdChirp() {
     ng.disconnect()
     hp.disconnect()
     lp.disconnect()
+    if (bus !== master) bus.disconnect()
   }
   o.start(now)
   o.stop(now + chirpDur + 0.02)

@@ -218,13 +218,14 @@ function WorldSlideCard({
     if (!card) return
     const target = raised ? 1 : 0
     if (active) slidePose.index = index
-    if (raised && !rising.current) {
+    const justRaised = raised && !rising.current
+    if (justRaised) {
       displayFacing.current = arrivalFacing(index, travelFacing, flying)
-      playRiseWhoosh()
       contactSfx.current = false
     }
     rising.current = raised
     const pose = routePose(index, displayFacing.current)
+    if (justRaised) playRiseWhoosh({ x: pose.x, y: pose.y, z: pose.z })
     if (
       !target &&
       Math.abs(rise.current) < 0.002 &&
@@ -276,7 +277,7 @@ function WorldSlideCard({
       bottom < foliageLine
     ) {
       contactSfx.current = true
-      playRiseWhoosh()
+      playRiseWhoosh({ x: pose.x + f.x, y: f.y, z: pose.z + f.z })
     }
     prevBottom.current = bottom
 

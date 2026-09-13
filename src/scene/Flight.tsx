@@ -9,8 +9,8 @@ import {
   waypointPose,
   waypointPos,
 } from './route'
-import { setFlightMix } from './FlightAudio'
-import { planePose } from './worldPoses'
+import { setFlightMix, syncAudioListener } from './FlightAudio'
+import { audioListenerPose, planePose } from './worldPoses'
 import { activeCameraView, CAMERA_VIEWS, VIEW_NUMS } from './cameraViews'
 import { terrainHeight } from './Terrain'
 
@@ -698,6 +698,12 @@ export function Flight({
       cam.fov = fov
       cam.updateProjectionMatrix()
     }
+
+    audioListenerPose.pos.copy(state.camera.position)
+    state.camera.getWorldDirection(audioListenerPose.forward)
+    audioListenerPose.up.set(0, 1, 0).applyQuaternion(state.camera.quaternion)
+    audioListenerPose.valid = true
+    syncAudioListener()
   })
 
   return (
