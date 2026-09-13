@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { getSlideArt } from '../SlideArt'
+import { lines } from '../slideMarkup'
 import { SLIDES, type Slide } from '../slides'
 import { waypointPose } from './route'
 import { blockMaterials } from './blockTextures'
@@ -53,24 +54,6 @@ const ART_BACKGROUNDS: Record<string, string> = {
   flag: '#7ec4ee',
 }
 
-function lines(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  x: number,
-  y: number,
-  width: number,
-  lineHeight: number,
-) {
-  const rows: string[] = []
-  for (const word of text.split(' ')) {
-    const next = rows.at(-1)
-    if (!next || ctx.measureText(`${next} ${word}`).width > width) rows.push(word)
-    else rows[rows.length - 1] = `${next} ${word}`
-  }
-  rows.forEach((row, i) => ctx.fillText(row, x, y + i * lineHeight))
-  return y + rows.length * lineHeight
-}
-
 function drawArt(ctx: CanvasRenderingContext2D, id: string) {
   const art = getSlideArt(id)
   const x = 52
@@ -109,18 +92,29 @@ function drawSlide(canvas: HTMLCanvasElement, slide: Slide) {
   ctx.fillText(slide.era.toUpperCase(), 52, 82)
 
   ctx.fillStyle = '#1b140c'
-  ctx.font = '44px "Press Start 2P", monospace'
-  let y = lines(ctx, slide.title, 405, 170, 1070, 58)
+  const title = {
+    body: '44px "Press Start 2P", monospace',
+    em: '44px "Press Start 2P", monospace',
+    code: '22px "Press Start 2P", monospace',
+  }
+  let y = lines(ctx, slide.title, 405, 170, 1070, 58, title)
 
-  ctx.font = '600 40px Outfit, sans-serif'
-  y = lines(ctx, slide.lead, 405, y + 28, 1070, 49)
+  const lead = {
+    body: '600 40px Outfit, sans-serif',
+    em: '800 40px Outfit, sans-serif',
+    code: '15px "Press Start 2P", monospace',
+  }
+  y = lines(ctx, slide.lead, 405, y + 28, 1070, 49, lead)
 
-  ctx.font = '36px Outfit, sans-serif'
-  for (const point of slide.points) {
+  const point = {
+    body: '36px Outfit, sans-serif',
+    em: '800 36px Outfit, sans-serif',
+    code: '14px "Press Start 2P", monospace',
+  }
+  for (const copy of slide.points) {
     ctx.fillStyle = '#3d7a28'
     ctx.fillRect(405, y + 16, 14, 14)
-    ctx.fillStyle = '#1b140c'
-    y = lines(ctx, point, 438, y, 1037, 45) + 12
+    y = lines(ctx, copy, 438, y, 1037, 45, point) + 12
   }
 }
 

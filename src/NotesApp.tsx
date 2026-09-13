@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useNotesSync, type SyncStatus } from './presentationSync'
+import { plain } from './slideMarkup'
 import { SLIDES } from './slides'
 import './speaker-notes.css'
 
@@ -16,7 +17,7 @@ export default function NotesApp() {
   const next = SLIDES[index + 1]
 
   useEffect(() => {
-    document.title = `${index + 1}/${SLIDES.length} · ${slide.title} · Speaker Notes`
+    document.title = `${index + 1}/${SLIDES.length} · ${plain(slide.title)} · Speaker Notes`
   }, [index, slide.title])
 
   useEffect(() => {
@@ -62,8 +63,8 @@ export default function NotesApp() {
         <article className="notes-card" aria-labelledby="current-slide-title">
           <p className="notes-eyebrow">Current waypoint · {index + 1} of {SLIDES.length}</p>
           <p className="notes-era">{slide.era}</p>
-          <h1 id="current-slide-title">{slide.title}</h1>
-          <p className="notes-context">{slide.lead}</p>
+          <h1 id="current-slide-title">{plain(slide.title)}</h1>
+          <p className="notes-context">{plain(slide.lead)}</p>
 
           <h2>Speaker notes</h2>
           <ul className="speaker-copy">
@@ -97,8 +98,8 @@ export default function NotesApp() {
             {next ? (
               <>
                 <p className="preview-waypoint">Waypoint {index + 2}</p>
-                <h2>{next.title}</h2>
-                <p>{next.lead}</p>
+                <h2>{plain(next.title)}</h2>
+                <p>{plain(next.lead)}</p>
               </>
             ) : (
               <>

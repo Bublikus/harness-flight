@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react'
 import { assistSrc } from './assistImages'
+import { plain } from './slideMarkup'
 import { SLIDES } from './slides'
 import './assist.css'
 
@@ -54,7 +55,7 @@ function load(): Saved {
   } catch {
     /* keep defaults */
   }
-  return { ...park(dock, w, h, from), w, h, dock, home, views }
+  return { ...park(dock, w, h, from && { x: from.x + w / 2, y: from.y + h / 2 }), w, h, dock, home, views }
 }
 
 function save(s: Saved) {
@@ -72,30 +73,37 @@ function save(s: Saved) {
   )
 }
 
-function park(dock: Dock, w: number, h: number, from?: { x: number; y: number }) {
+function tabAt(p: { x: number; y: number; w: number; h: number }) {
+  return { x: p.x + p.w / 2, y: p.y + p.h / 2 }
+}
+
+/** Park off `dock`. `at` is the peek-tab / pointer point (canvas side-center), not the card origin. */
+function park(dock: Dock, w: number, h: number, at?: { x: number; y: number }) {
   const vw = window.innerWidth
   const vh = window.innerHeight
-  const cy = from ? clamp(from.y, 8, vh - h - 8) : clamp(vh / 2 - h / 2, 8, vh - h - 8)
-  const cx = from ? clamp(from.x, 8, vw - w - 8) : clamp(vw / 2 - w / 2, 8, vw - w - 8)
+  const tab = 36
+  const cy = at
+    ? clamp(at.y - h / 2, tab - h / 2, vh - tab - h / 2)
+    : clamp(vh / 2 - h / 2, 8, vh - h - 8)
+  const cx = at
+    ? clamp(at.x - w / 2, tab - w / 2, vw - tab - w / 2)
+    : clamp(vw / 2 - w / 2, 8, vw - w - 8)
   if (dock === 'left') return { x: -w, y: cy }
   if (dock === 'right') return { x: vw, y: cy }
   if (dock === 'top') return { x: cx, y: -h }
   return { x: cx, y: vh }
 }
 
-/** Peek tab along the free axis at the card center; clamp fully on-screen. */
-function placePeek(tab: HTMLButtonElement, p: Pose) {
-  if (!p.dock) return
-  const pad = 8
-  if (p.dock === 'left' || p.dock === 'right') {
-    const th = tab.offsetHeight || 72
-    tab.style.top = `${clamp(p.y + p.h / 2 - th / 2, pad, window.innerHeight - th - pad)}px`
-    tab.style.left = ''
-  } else {
-    const tw = tab.offsetWidth || 72
-    tab.style.left = `${clamp(p.x + p.w / 2 - tw / 2, pad, window.innerWidth - tw - pad)}px`
-    tab.style.top = ''
-  }
+function visibleFrac(p: { x: number; y: number; w: number; h: number }) {
+  const x0 = Math.max(p.x, 0)
+  const y0 = Math.max(p.y, 0)
+  const x1 = Math.min(p.x + p.w, window.innerWidth)
+  const y1 = Math.min(p.y + p.h, window.innerHeight)
+  return (Math.max(0, x1 - x0) * Math.max(0, y1 - y0)) / (p.w * p.h)
+}
+
+function peekSide(p: Pose): Dock | null {
+  return p.dock ?? p.pending
 }
 
 function ensureExit(side: Dock, p: Pose) {
@@ -104,6 +112,42 @@ function ensureExit(side: Dock, p: Pose) {
   else if (side === 'right') p.vx = Math.max(p.vx, out)
   else if (side === 'top') p.vy = Math.min(p.vy, -out)
   else p.vy = Math.max(p.vy, out)
+}
+
+function holdOnscreen(p: Pose) {
+  if (p.dock === 'left') p.x = Math.max(p.x, -p.w)
+  else if (p.dock === 'right') p.x = Math.min(p.x, window.innerWidth)
+  else if (p.dock === 'top') p.y = Math.max(p.y, -p.h)
+  else if (p.dock === 'bottom') p.y = Math.min(p.y, window.innerHeight)
+}
+
+function nudgeDocked(p: Pose, dx: number, dy: number, at: { x: number; y: number }) {
+  if (!p.dock) return
+  p.x += dx
+  p.y += dy
+  holdOnscreen(p)
+  if (visibleFrac(p) > 0.2) return
+  const tab = 36
+  const wrap = 20
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  if (p.dock === 'left' || p.dock === 'right') {
+    const min = tab - p.h / 2
+    const max = vh - tab - p.h / 2
+    const next = p.y < min - wrap ? 'top' : p.y > max + wrap ? 'bottom' : null
+    if (next) {
+      p.dock = next
+      Object.assign(p, park(next, p.w, p.h, at))
+    }
+    return
+  }
+  const min = tab - p.w / 2
+  const max = vw - tab - p.w / 2
+  const next = p.x < min - wrap ? 'left' : p.x > max + wrap ? 'right' : null
+  if (next) {
+    p.dock = next
+    Object.assign(p, park(next, p.w, p.h, at))
+  }
 }
 
 function pickDock(x: number, y: number, w: number, h: number, vx: number, vy: number): Dock | null {
@@ -131,6 +175,8 @@ export function AssistOverlay({ index }: { index: number }) {
   const stage = useRef<HTMLDivElement>(null)
   const pic = useRef<HTMLImageElement>(null)
   const pose = useRef<Pose>({ ...load(), vx: 0, vy: 0, restore: false, pending: null })
+  const parkAim = useRef<{ x: number; y: number } | null>(null)
+  const hidePeek = useRef(false)
   const drag = useRef<{
     kind: 'move' | 'pan' | 'resize'
     px: number
@@ -172,16 +218,29 @@ export function AssistOverlay({ index }: { index: number }) {
     el.dataset.dock = p.dock ?? ''
     el.classList.toggle('docked', !!p.dock)
     el.classList.toggle('dragging', !!drag.current || !!p.pending)
-    setDock((side) => (side === p.dock ? side : p.dock))
+    const side = hidePeek.current ? null : p.dock ?? p.pending
+    setDock((prev) => (side === prev ? prev : side))
     const tab = peek.current
     if (tab) {
-      tab.dataset.dock = p.dock ?? ''
-      placePeek(tab, p)
+      tab.dataset.dock = side ?? ''
+      tab.style.visibility = side ? '' : 'hidden'
     }
     const image = pic.current
     if (!image) return
     const v = viewOf()
     image.style.transform = `translate(${v.x}px, ${v.y}px) scale(${v.z})`
+  }
+
+  const revealPeek = (side: Dock) => {
+    hidePeek.current = false
+    const tab = peek.current
+    if (!tab) return
+    tab.dataset.dock = side
+    tab.style.visibility = ''
+    tab.classList.add('tuck')
+    void tab.offsetWidth
+    tab.classList.remove('tuck')
+    setDock(side)
   }
 
   const writeView = (next: View) => {
@@ -235,17 +294,14 @@ export function AssistOverlay({ index }: { index: number }) {
       if (side) {
         p.pending = side
         ensureExit(side, p)
-        const to = park(side, p.w, p.h, p)
+        const to = park(side, p.w, p.h, tabAt(p))
         p.x += p.vx * dt
         p.y += p.vy * dt
-        // Ease free axis to release pose; dock axis coasts with velocity + soft pull
-        const ease = 1 - Math.exp(-10 * dt)
+        // Dock axis only; keep along-edge pose until the sheet is off-screen
         if (side === 'left' || side === 'right') {
-          p.y += (to.y - p.y) * ease
           p.vy *= Math.exp(-8 * dt)
           p.vx += (to.x - p.x) * 8 * dt
         } else {
-          p.x += (to.x - p.x) * ease
           p.vx *= Math.exp(-8 * dt)
           p.vy += (to.y - p.y) * 8 * dt
         }
@@ -255,13 +311,29 @@ export function AssistOverlay({ index }: { index: number }) {
           (side === 'bottom' && p.y >= to.y - 2) ||
           (side === 'top' && p.y <= to.y + 2)
         if (done) {
-          p.x = to.x
-          p.y = to.y
+          const end = park(side, p.w, p.h, parkAim.current ?? tabAt(p))
+          parkAim.current = null
+          p.x = end.x
+          p.y = end.y
           p.vx = 0
           p.vy = 0
           p.dock = side
           p.pending = null
+          const slideIn = hidePeek.current
           save(p)
+          const node = root.current
+          if (node) {
+            node.classList.add('dragging')
+            node.style.transform = `translate(${end.x}px, ${end.y}px)`
+            void node.offsetWidth
+          }
+          paint()
+          if (slideIn) {
+            requestAnimationFrame(() => {
+              if (pose.current.dock === side && !drag.current) revealPeek(side)
+            })
+          }
+          return
         }
         paint()
         return
@@ -290,7 +362,7 @@ export function AssistOverlay({ index }: { index: number }) {
       const p = pose.current
       p.w = clamp(p.w, MIN_W, window.innerWidth - 16)
       p.h = clamp(p.h, MIN_H, window.innerHeight - 16)
-      if (p.dock) Object.assign(p, park(p.dock, p.w, p.h, p))
+      if (p.dock) Object.assign(p, park(p.dock, p.w, p.h, tabAt(p)))
       else {
         p.x = clamp(p.x, 16, window.innerWidth - p.w - 16)
         p.y = clamp(p.y, 16, window.innerHeight - p.h - 16)
@@ -309,7 +381,9 @@ export function AssistOverlay({ index }: { index: number }) {
       }
       const d = drag.current
       const p = pose.current
-      if (d?.kind === 'move' && !d.moved && d.docked) {
+      if (d?.kind === 'move' && d.docked && (!d.moved || visibleFrac(p) >= 2 / 3)) {
+        hidePeek.current = false
+        parkAim.current = null
         p.dock = null
         p.pending = null
         p.restore = false
@@ -317,10 +391,25 @@ export function AssistOverlay({ index }: { index: number }) {
         p.y = p.home.y
         p.vx = 0
         p.vy = 0
-      } else if (d?.kind === 'move') {
+      } else if (d?.kind === 'move' && d.docked) {
+        const side =
+          pickDock(p.x, p.y, p.w, p.h, p.vx, p.vy) ??
+          pickDock(p.x, p.y, p.w, p.h, 0, 0) ??
+          p.dock ??
+          'right'
+        hidePeek.current = true
+        parkAim.current = { x: e.clientX, y: e.clientY }
+        p.pending = side
+        p.dock = null
+        if (side === 'left' || side === 'right') p.vy = 0
+        else p.vx = 0
+        ensureExit(side, p)
+      } else if (d?.kind === 'move' && !p.dock) {
         // Keep exact release pose + velocity; RAF coasts into park / settle (no teleport)
         const side = pickDock(p.x, p.y, p.w, p.h, p.vx, p.vy) ?? pickDock(p.x, p.y, p.w, p.h, 0, 0)
         if (side) {
+          hidePeek.current = true
+          parkAim.current = null
           p.pending = side
           p.dock = null
           ensureExit(side, p)
@@ -369,14 +458,19 @@ export function AssistOverlay({ index }: { index: number }) {
       const dt = Math.max(0.008, (now - d.t) / 1000)
       const box = pose.current
       if (d.kind === 'move') {
-        if (box.dock && d.moved) box.dock = null
-        if (!box.dock) {
+        if (box.dock) {
+          if (d.moved) {
+            nudgeDocked(box, dx, dy, { x: e.clientX, y: e.clientY })
+            box.vx = dx / dt
+            box.vy = dy / dt
+          }
+        } else {
           box.x += dx
           box.y += dy
           box.vx = dx / dt
           box.vy = dy / dt
-          paint()
         }
+        paint()
       } else if (d.kind === 'pan') {
         const v = viewOf()
         writeView({ ...v, x: v.x + dx, y: v.y + dy })
@@ -476,38 +570,39 @@ export function AssistOverlay({ index }: { index: number }) {
   const n = String(index + 1).padStart(2, '0')
 
   return (
-    <>
-      <aside
-        ref={root}
-        className={start.dock ? 'assist docked' : 'assist'}
-        style={{
-          transform: `translate(${start.x}px, ${start.y}px)`,
-          width: start.w,
-          height: start.h,
+    <aside
+      ref={root}
+      className={start.dock ? 'assist docked' : 'assist'}
+      style={{
+        transform: `translate(${start.x}px, ${start.y}px)`,
+        width: start.w,
+        height: start.h,
+      }}
+      data-dock={start.dock ?? ''}
+    >
+      <header className="assist-bar" onPointerDown={(e) => begin('move', e)}>
+        <span>ASSIST · {n}</span>
+        <span className="assist-title">{plain(slide.title)}</span>
+      </header>
+      <div ref={stage} className="assist-view" onPointerDown={beginPan}>
+        <img key={src} ref={pic} src={src} alt="" draggable={false} />
+      </div>
+      <div className="assist-resize" onPointerDown={(e) => begin('resize', e)} />
+      <button
+        ref={peek}
+        type="button"
+        className="assist-tab"
+        data-dock={dock ?? ''}
+        aria-label="Show assist canvas"
+        aria-hidden={!dock}
+        tabIndex={dock ? 0 : -1}
+        onPointerDown={(e) => {
+          if (!peekSide(pose.current)) return
+          begin('move', e)
         }}
-        data-dock={start.dock ?? ''}
       >
-        <header className="assist-bar" onPointerDown={(e) => begin('move', e)}>
-          <span>ASSIST · {n}</span>
-          <span className="assist-title">{slide.title}</span>
-        </header>
-        <div ref={stage} className="assist-view" onPointerDown={beginPan}>
-          <img key={src} ref={pic} src={src} alt="" draggable={false} />
-        </div>
-        <div className="assist-resize" onPointerDown={(e) => begin('resize', e)} />
-      </aside>
-      {dock && (
-        <button
-          ref={peek}
-          type="button"
-          className="assist-tab"
-          data-dock={dock}
-          aria-label="Show assist canvas"
-          onPointerDown={(e) => begin('move', e)}
-        >
-          {n}
-        </button>
-      )}
-    </>
+        {n}
+      </button>
+    </aside>
   )
 }

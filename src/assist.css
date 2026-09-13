@@ -21,6 +21,7 @@
     0 0 0 3px var(--oak-dark),
     6px 6px 0 rgba(12, 8, 4, 0.9);
   color: var(--paper);
+  overflow: visible;
   pointer-events: auto;
   touch-action: none;
   user-select: none;
@@ -33,21 +34,32 @@
 }
 
 .assist.docked {
-  background: transparent;
-  border-color: transparent;
-  box-shadow: none;
   pointer-events: none;
 }
 
-.assist.docked .assist-bar,
-.assist.docked .assist-view,
-.assist.docked .assist-resize {
+.assist.docked:not(.dragging) {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.assist.docked .assist-tab {
+  pointer-events: auto;
+}
+
+.assist.docked:not(.dragging) .assist-bar,
+.assist.docked:not(.dragging) .assist-view,
+.assist.docked:not(.dragging) .assist-resize {
   visibility: hidden;
 }
 
+.assist-tab[data-dock=''] {
+  display: none;
+}
+
 .assist-tab {
-  position: fixed;
-  z-index: 21;
+  position: absolute;
+  z-index: 2;
   display: grid;
   place-items: center;
   margin: 0;
@@ -67,10 +79,14 @@
   pointer-events: auto;
   touch-action: none;
   user-select: none;
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.assist-tab.tuck {
+  transition: none;
 }
 
 .assist-tab:active {
-  transform: translateY(1px);
   box-shadow:
     inset 0 2px 0 rgba(255, 255, 255, 0.2),
     inset 0 -1px 0 rgba(90, 55, 10, 0.4),
@@ -79,50 +95,80 @@
 
 .assist-tab[data-dock='left'],
 .assist-tab[data-dock='right'] {
-  display: grid;
   width: 36px;
   height: 72px;
+  top: 50%;
 }
 
 .assist-tab[data-dock='left'] {
-  left: 0;
+  left: 100%;
+  margin-left: 4px;
   border-left: none;
   border-radius: 0 4px 4px 0;
+  transform: translateY(-50%);
 }
 
 .assist-tab[data-dock='right'] {
-  right: 0;
+  right: 100%;
+  margin-right: 4px;
   border-right: none;
   border-radius: 4px 0 0 4px;
+  transform: translateY(-50%);
 }
 
 .assist-tab[data-dock='top'],
 .assist-tab[data-dock='bottom'] {
-  display: grid;
   width: 72px;
   height: 36px;
+  left: 50%;
 }
 
 .assist-tab[data-dock='top'] {
-  top: 0;
+  top: 100%;
+  margin-top: 4px;
   border-top: none;
   border-radius: 0 0 4px 4px;
+  transform: translateX(-50%);
 }
 
 .assist-tab[data-dock='bottom'] {
-  bottom: 0;
+  bottom: 100%;
+  margin-bottom: 4px;
   border-bottom: none;
   border-radius: 4px 4px 0 0;
+  transform: translateX(-50%);
 }
 
-.assist-tab[data-dock='left']:active,
-.assist-tab[data-dock='right']:active {
-  transform: translateX(1px);
+.assist-tab.tuck[data-dock='left'] {
+  transform: translateY(-50%) translateX(calc(-100% - 4px));
 }
 
-.assist-tab[data-dock='top']:active,
-.assist-tab[data-dock='bottom']:active {
-  transform: translateY(1px);
+.assist-tab.tuck[data-dock='right'] {
+  transform: translateY(-50%) translateX(calc(100% + 4px));
+}
+
+.assist-tab.tuck[data-dock='top'] {
+  transform: translateX(-50%) translateY(calc(-100% - 4px));
+}
+
+.assist-tab.tuck[data-dock='bottom'] {
+  transform: translateX(-50%) translateY(calc(100% + 4px));
+}
+
+.assist-tab:not(.tuck)[data-dock='left']:active {
+  transform: translateY(-50%) translateX(1px);
+}
+
+.assist-tab:not(.tuck)[data-dock='right']:active {
+  transform: translateY(-50%) translateX(-1px);
+}
+
+.assist-tab:not(.tuck)[data-dock='top']:active {
+  transform: translateX(-50%) translateY(1px);
+}
+
+.assist-tab:not(.tuck)[data-dock='bottom']:active {
+  transform: translateX(-50%) translateY(-1px);
 }
 
 @media (hover: none), (pointer: coarse) {
