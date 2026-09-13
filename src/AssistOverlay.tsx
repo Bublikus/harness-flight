@@ -150,6 +150,13 @@ function nudgeDocked(p: Pose, dx: number, dy: number, at: { x: number; y: number
   }
 }
 
+function flickDock(vx: number, vy: number): [Dock, Dock | null] {
+  if (Math.abs(vx) >= Math.abs(vy)) {
+    return [vx < 0 ? 'left' : 'right', vy < 0 ? 'top' : vy > 0 ? 'bottom' : null]
+  }
+  return [vy < 0 ? 'top' : 'bottom', vx < 0 ? 'left' : vx > 0 ? 'right' : null]
+}
+
 function pickDock(x: number, y: number, w: number, h: number, vx: number, vy: number): Dock | null {
   const vw = window.innerWidth
   const vh = window.innerHeight
@@ -157,12 +164,28 @@ function pickDock(x: number, y: number, w: number, h: number, vx: number, vy: nu
   const offR = Math.max(0, x + w - vw) / w
   const offT = Math.max(0, -y) / h
   const offB = Math.max(0, y + h - vh) / h
-  if (vx < -900 && x < w * 0.35) return 'left'
-  if (vx > 900 && x + w > vw - w * 0.35) return 'right'
-  if (vy < -900 && y < h * 0.35) return 'top'
-  if (vy > 900 && y + h > vh - h * 0.35) return 'bottom'
+  const off = { left: offL, right: offR, top: offT, bottom: offB }
   const worst = Math.max(offL, offR, offT, offB)
-  if (worst < 0.42) return null
+  const caught = worst >= 0.42
+  const near = (side: Dock) =>
+    side === 'left'
+      ? x < w * 0.35
+      : side === 'right'
+        ? x + w > vw - w * 0.35
+        : side === 'top'
+          ? y < h * 0.35
+          : y + h > vh - h * 0.35
+  const swallow = (side: Dock) => {
+    const fast = Math.abs(side === 'left' || side === 'right' ? vx : vy) > 900
+    return (caught && off[side] > 0) || (fast && near(side))
+  }
+  // Flick direction wins over nearest overflow so the hide continues the throw
+  if (Math.hypot(vx, vy) > 40) {
+    const [dir, alt] = flickDock(vx, vy)
+    if (swallow(dir)) return dir
+    if (alt && swallow(alt)) return alt
+  }
+  if (!caught) return null
   if (offL === worst) return 'left'
   if (offR === worst) return 'right'
   if (offT === worst) return 'top'
@@ -461,14 +484,18 @@ export function AssistOverlay({ index }: { index: number }) {
         if (box.dock) {
           if (d.moved) {
             nudgeDocked(box, dx, dy, { x: e.clientX, y: e.clientY })
-            box.vx = dx / dt
-            box.vy = dy / dt
+            if (Math.hypot(dx, dy) > 3) {
+              box.vx = dx / dt
+              box.vy = dy / dt
+            }
           }
         } else {
           box.x += dx
           box.y += dy
-          box.vx = dx / dt
-          box.vy = dy / dt
+          if (Math.hypot(dx, dy) > 3) {
+            box.vx = dx / dt
+            box.vy = dy / dt
+          }
         }
         paint()
       } else if (d.kind === 'pan') {
