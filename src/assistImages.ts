@@ -22,11 +22,26 @@ function placeholder(index: number) {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
 }
 
-export function assistSrc(index: number) {
-  const prefix = `${index + 1}_`
-  for (const [path, url] of Object.entries(files)) {
-    const name = path.split('/').pop() ?? ''
-    if (name.startsWith(prefix)) return url
-  }
-  return placeholder(index)
+function fileName(path: string) {
+  return path.split('/').pop() ?? ''
+}
+
+function slideOf(name: string) {
+  const m = /^(\d+)_/.exec(name)
+  return m ? Number(m[1]) - 1 : null
+}
+
+/** Column count for a compact square-ish grid. n=2 is landscape 1×2; CSS stacks when tall. */
+export function assistCols(n: number) {
+  if (n <= 1) return 1
+  if (n <= 4) return 2
+  return Math.ceil(Math.sqrt(n))
+}
+
+export function assistSrcs(index: number) {
+  const urls = Object.entries(files)
+    .filter(([path]) => slideOf(fileName(path)) === index)
+    .sort(([a], [b]) => fileName(a).localeCompare(fileName(b)))
+    .map(([, url]) => url)
+  return urls.length ? urls : [placeholder(index)]
 }

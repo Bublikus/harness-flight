@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react'
-import { assistSrc } from './assistImages'
+import { assistCols, assistSrcs } from './assistImages'
 import { plain } from './slideMarkup'
 import { SLIDES } from './slides'
 import './assist.css'
@@ -196,7 +196,7 @@ export function AssistOverlay({ index }: { index: number }) {
   const root = useRef<HTMLElement>(null)
   const peek = useRef<HTMLButtonElement>(null)
   const stage = useRef<HTMLDivElement>(null)
-  const pic = useRef<HTMLImageElement>(null)
+  const sheet = useRef<HTMLDivElement>(null)
   const pose = useRef<Pose>({ ...load(), vx: 0, vy: 0, restore: false, pending: null })
   const parkAim = useRef<{ x: number; y: number } | null>(null)
   const hidePeek = useRef(false)
@@ -220,7 +220,8 @@ export function AssistOverlay({ index }: { index: number }) {
   const zoomAim = useRef<(View & { i: number }) | null>(null)
   const indexRef = useRef(index)
   indexRef.current = index
-  const src = assistSrc(index)
+  const srcs = assistSrcs(index)
+  const srcKey = srcs.join('\0')
   const start = pose.current
   const [dock, setDock] = useState<Dock | null>(start.dock)
 
@@ -248,7 +249,7 @@ export function AssistOverlay({ index }: { index: number }) {
       tab.dataset.dock = side ?? ''
       tab.style.visibility = side ? '' : 'hidden'
     }
-    const image = pic.current
+    const image = sheet.current
     if (!image) return
     const v = viewOf()
     image.style.transform = `translate(${v.x}px, ${v.y}px) scale(${v.z})`
@@ -268,7 +269,7 @@ export function AssistOverlay({ index }: { index: number }) {
 
   const writeView = (next: View) => {
     pose.current.views[indexRef.current] = next
-    const image = pic.current
+    const image = sheet.current
     if (image) image.style.transform = `translate(${next.x}px, ${next.y}px) scale(${next.z})`
   }
 
@@ -530,7 +531,7 @@ export function AssistOverlay({ index }: { index: number }) {
 
   useEffect(() => {
     paint()
-  }, [index, src, dock])
+  }, [index, srcKey, dock])
 
   useEffect(() => {
     const node = stage.current
@@ -612,7 +613,16 @@ export function AssistOverlay({ index }: { index: number }) {
         <span className="assist-title">{plain(slide.title)}</span>
       </header>
       <div ref={stage} className="assist-view" onPointerDown={beginPan}>
-        <img key={src} ref={pic} src={src} alt="" draggable={false} />
+        <div
+          ref={sheet}
+          className="assist-grid"
+          data-n={srcs.length}
+          data-cols={assistCols(srcs.length)}
+        >
+          {srcs.map((src) => (
+            <img key={src} src={src} alt="" draggable={false} />
+          ))}
+        </div>
       </div>
       <div className="assist-resize" onPointerDown={(e) => begin('resize', e)} />
       <button
