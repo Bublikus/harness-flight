@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AssistOverlay } from './AssistOverlay'
+import { AssistOverlay, hideAssistOverlay } from './AssistOverlay'
 import { CameraDock, Hud, SettingsDock, SoundDock, TitleScreen } from './Hud'
 import { activeCameraView, CAMERA_VIEWS, cycleCameraView } from './scene/cameraViews'
 import { World } from './scene/World'
@@ -52,6 +52,7 @@ export default function App() {
       setPendingFinale(false)
       return
     }
+    hideAssistOverlay()
     const fromWp = waypointIndex(index)
     const toWp = waypointIndex(next)
     if (fromWp === toWp) {

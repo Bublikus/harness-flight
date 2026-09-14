@@ -8,9 +8,12 @@ const KEY = 'harness-flight-assist-v1'
 const MIN_W = 280
 const MIN_H = 200
 const ZOOM = 1.12 ** 0.2
+const CLICK = 3
+const FIT_PAD = 12
 
 type Dock = 'left' | 'right' | 'top' | 'bottom'
 type View = { z: number; x: number; y: number }
+const GRID: View = { z: 1, x: 0, y: 0 }
 type Saved = {
   x: number
   y: number
@@ -25,6 +28,39 @@ type Pose = Saved & { vx: number; vy: number; restore: boolean; pending: Dock | 
 
 function clamp(n: number, a: number, b: number) {
   return Math.min(b, Math.max(a, n))
+}
+
+function nearView(a: View, b: View) {
+  return Math.abs(a.z - b.z) < 0.04 && Math.hypot(a.x - b.x, a.y - b.y) < 4
+}
+
+function hitPhoto(grid: HTMLElement, x: number, y: number) {
+  for (const img of grid.querySelectorAll('img')) {
+    const r = img.getBoundingClientRect()
+    if (x >= r.left && x < r.right && y >= r.top && y < r.bottom) return img
+  }
+  return null
+}
+
+function photoBox(img: HTMLImageElement) {
+  const r = img.getBoundingClientRect()
+  const nw = img.naturalWidth
+  const nh = img.naturalHeight
+  if (!nw || !nh) return r
+  const s = Math.min(r.width / nw, r.height / nh)
+  const w = nw * s
+  const h = nh * s
+  return { left: r.left + (r.width - w) / 2, top: r.top + (r.height - h) / 2, width: w, height: h }
+}
+
+function fitPhoto(img: HTMLImageElement, stage: DOMRectReadOnly, v: View): View {
+  const r = photoBox(img)
+  const gx = (r.left - stage.left - v.x) / v.z
+  const gy = (r.top - stage.top - v.y) / v.z
+  const gw = r.width / v.z
+  const gh = r.height / v.z
+  const z = clamp(Math.min((stage.width - FIT_PAD * 2) / gw, (stage.height - FIT_PAD * 2) / gh), 0.4, 8)
+  return { z, x: stage.width / 2 - (gx + gw / 2) * z, y: stage.height / 2 - (gy + gh / 2) * z }
 }
 
 function load(): Saved {
@@ -100,10 +136,6 @@ function visibleFrac(p: { x: number; y: number; w: number; h: number }) {
   const x1 = Math.min(p.x + p.w, window.innerWidth)
   const y1 = Math.min(p.y + p.h, window.innerHeight)
   return (Math.max(0, x1 - x0) * Math.max(0, y1 - y0)) / (p.w * p.h)
-}
-
-function peekSide(p: Pose): Dock | null {
-  return p.dock ?? p.pending
 }
 
 function ensureExit(side: Dock, p: Pose) {
@@ -192,6 +224,13 @@ function pickDock(x: number, y: number, w: number, h: number, vx: number, vy: nu
   return 'bottom'
 }
 
+const HIDE = 'harness-assist-hide'
+
+/** Park the on-screen canvas (no-op if already docked). Peek-tab click still uses the same path. */
+export function hideAssistOverlay() {
+  window.dispatchEvent(new Event(HIDE))
+}
+
 export function AssistOverlay({ index }: { index: number }) {
   const root = useRef<HTMLElement>(null)
   const peek = useRef<HTMLButtonElement>(null)
@@ -207,6 +246,7 @@ export function AssistOverlay({ index }: { index: number }) {
     t: number
     moved: boolean
     docked: boolean
+    fromTab: boolean
   } | null>(null)
   const pointers = useRef(new Map<number, { x: number; y: number }>())
   const pinch = useRef<{
@@ -220,16 +260,20 @@ export function AssistOverlay({ index }: { index: number }) {
   const zoomAim = useRef<(View & { i: number }) | null>(null)
   const indexRef = useRef(index)
   indexRef.current = index
-  const srcs = assistSrcs(index)
+  const [shownIndex, setShownIndex] = useState(index)
+  const shownRef = useRef(shownIndex)
+  shownRef.current = shownIndex
+  const srcs = assistSrcs(shownIndex)
   const srcKey = srcs.join('\0')
   const start = pose.current
+  const lastDock = useRef<Dock>(start.dock ?? 'right')
   const [dock, setDock] = useState<Dock | null>(start.dock)
 
-  const viewOf = () => pose.current.views[indexRef.current] ?? { z: 1, x: 0, y: 0 }
+  const viewOf = () => pose.current.views[shownRef.current] ?? { z: 1, x: 0, y: 0 }
 
   const aimOf = (): View => {
     const a = zoomAim.current
-    return a && a.i === indexRef.current ? a : viewOf()
+    return a && a.i === shownRef.current ? a : viewOf()
   }
 
   const paint = () => {
@@ -242,12 +286,17 @@ export function AssistOverlay({ index }: { index: number }) {
     el.dataset.dock = p.dock ?? ''
     el.classList.toggle('docked', !!p.dock)
     el.classList.toggle('dragging', !!drag.current || !!p.pending)
-    const side = hidePeek.current ? null : p.dock ?? p.pending
+    const parked = p.dock ?? p.pending
+    if (parked) lastDock.current = parked
+    const side = hidePeek.current ? null : parked ?? lastDock.current
     setDock((prev) => (side === prev ? prev : side))
     const tab = peek.current
     if (tab) {
       tab.dataset.dock = side ?? ''
       tab.style.visibility = side ? '' : 'hidden'
+      tab.setAttribute('aria-label', p.dock ? 'Show assist canvas' : 'Hide assist canvas')
+      tab.setAttribute('aria-hidden', side ? 'false' : 'true')
+      tab.tabIndex = side ? 0 : -1
     }
     const image = sheet.current
     if (!image) return
@@ -261,6 +310,9 @@ export function AssistOverlay({ index }: { index: number }) {
     if (!tab) return
     tab.dataset.dock = side
     tab.style.visibility = ''
+    tab.setAttribute('aria-label', 'Show assist canvas')
+    tab.setAttribute('aria-hidden', 'false')
+    tab.tabIndex = 0
     tab.classList.add('tuck')
     void tab.offsetWidth
     tab.classList.remove('tuck')
@@ -268,7 +320,7 @@ export function AssistOverlay({ index }: { index: number }) {
   }
 
   const writeView = (next: View) => {
-    pose.current.views[indexRef.current] = next
+    pose.current.views[shownRef.current] = next
     const image = sheet.current
     if (image) image.style.transform = `translate(${next.x}px, ${next.y}px) scale(${next.z})`
   }
@@ -282,7 +334,7 @@ export function AssistOverlay({ index }: { index: number }) {
       const dt = Math.min(0.04, (now - last) / 1000)
       last = now
       const a = zoomAim.current
-      if (a && a.i !== indexRef.current) zoomAim.current = null
+      if (a && a.i !== shownRef.current) zoomAim.current = null
       else if (a) {
         const v = viewOf()
         const t = 1 - Math.exp(-14 * dt)
@@ -343,6 +395,7 @@ export function AssistOverlay({ index }: { index: number }) {
           p.vy = 0
           p.dock = side
           p.pending = null
+          setShownIndex(indexRef.current)
           const slideIn = hidePeek.current
           save(p)
           const node = root.current
@@ -394,6 +447,23 @@ export function AssistOverlay({ index }: { index: number }) {
       paint()
       save(p)
     }
+    const tuck = () => {
+      const p = pose.current
+      if (p.dock || p.pending) return
+      const side = lastDock.current
+      hidePeek.current = true
+      parkAim.current = null
+      p.restore = false
+      p.pending = side
+      p.dock = null
+      if (side === 'left' || side === 'right') p.vy = 0
+      else p.vx = 0
+      ensureExit(side, p)
+      const active = document.activeElement
+      if (active instanceof HTMLElement && active.closest('.assist')) active.blur()
+      save(p)
+      paint()
+    }
     const onUp = (e: globalThis.PointerEvent) => {
       pointers.current.delete(e.pointerId)
       if (pinch.current) {
@@ -405,7 +475,9 @@ export function AssistOverlay({ index }: { index: number }) {
       }
       const d = drag.current
       const p = pose.current
-      if (d?.kind === 'move' && d.docked && (!d.moved || visibleFrac(p) >= 2 / 3)) {
+      if (d?.kind === 'move' && d.fromTab && !d.docked && !d.moved) {
+        tuck()
+      } else if (d?.kind === 'move' && d.docked && (!d.moved || visibleFrac(p) >= 2 / 3)) {
         hidePeek.current = false
         parkAim.current = null
         p.dock = null
@@ -440,6 +512,17 @@ export function AssistOverlay({ index }: { index: number }) {
         } else {
           p.pending = null
         }
+      } else if (d?.kind === 'pan' && !d.moved) {
+        const node = stage.current
+        const grid = sheet.current
+        const img = grid && hitPhoto(grid, e.clientX, e.clientY)
+        if (node && img) {
+          const box = node.getBoundingClientRect()
+          const painted = viewOf()
+          const fit = fitPhoto(img, box, painted)
+          const next = nearView(aimOf(), fit) ? GRID : fit
+          zoomAim.current = { i: shownRef.current, ...next }
+        }
       }
       drag.current = null
       const el = root.current
@@ -466,7 +549,7 @@ export function AssistOverlay({ index }: { index: number }) {
         const next = clamp(pin.z * (dist / pin.dist) ** 0.2, 0.4, 8)
         const k = next / pin.z
         zoomAim.current = {
-          i: indexRef.current,
+          i: shownRef.current,
           z: next,
           x: cx - (pin.cx - pin.x) * k,
           y: cy - (pin.cy - pin.y) * k,
@@ -478,14 +561,14 @@ export function AssistOverlay({ index }: { index: number }) {
       const now = performance.now()
       const dx = e.clientX - d.px
       const dy = e.clientY - d.py
-      if (Math.hypot(dx, dy) > 3) d.moved = true
+      if (Math.hypot(dx, dy) > CLICK) d.moved = true
       const dt = Math.max(0.008, (now - d.t) / 1000)
       const box = pose.current
       if (d.kind === 'move') {
         if (box.dock) {
           if (d.moved) {
             nudgeDocked(box, dx, dy, { x: e.clientX, y: e.clientY })
-            if (Math.hypot(dx, dy) > 3) {
+            if (Math.hypot(dx, dy) > CLICK) {
               box.vx = dx / dt
               box.vy = dy / dt
             }
@@ -493,19 +576,21 @@ export function AssistOverlay({ index }: { index: number }) {
         } else {
           box.x += dx
           box.y += dy
-          if (Math.hypot(dx, dy) > 3) {
+          if (Math.hypot(dx, dy) > CLICK) {
             box.vx = dx / dt
             box.vy = dy / dt
           }
         }
         paint()
       } else if (d.kind === 'pan') {
-        const v = viewOf()
-        writeView({ ...v, x: v.x + dx, y: v.y + dy })
-        const aim = zoomAim.current
-        if (aim && aim.i === indexRef.current) {
-          aim.x += dx
-          aim.y += dy
+        if (d.moved) {
+          const v = viewOf()
+          writeView({ ...v, x: v.x + dx, y: v.y + dy })
+          const aim = zoomAim.current
+          if (aim && aim.i === shownRef.current) {
+            aim.x += dx
+            aim.y += dy
+          }
         }
       } else {
         box.w = clamp(box.w + dx, MIN_W, window.innerWidth - 16)
@@ -516,22 +601,41 @@ export function AssistOverlay({ index }: { index: number }) {
       d.py = e.clientY
       d.t = now
     }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== 'Escape') return
+      const typing =
+        e.target instanceof HTMLElement &&
+        !!e.target.closest('input, textarea, select, [contenteditable="true"]')
+      if (typing) return
+      const p = pose.current
+      if (p.dock || p.pending) return
+      e.preventDefault()
+      tuck()
+    }
     window.addEventListener('resize', onResize)
     window.addEventListener('pointermove', onWinMove)
     window.addEventListener('pointerup', onUp)
     window.addEventListener('pointercancel', onUp)
+    window.addEventListener(HIDE, tuck)
+    window.addEventListener('keydown', onKey)
     return () => {
       cancelAnimationFrame(raf)
       window.removeEventListener('resize', onResize)
       window.removeEventListener('pointermove', onWinMove)
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', onUp)
+      window.removeEventListener(HIDE, tuck)
+      window.removeEventListener('keydown', onKey)
     }
   }, [])
 
   useEffect(() => {
     paint()
-  }, [index, srcKey, dock])
+  }, [shownIndex, srcKey, dock])
+
+  useEffect(() => {
+    if (pose.current.dock) setShownIndex(index)
+  }, [index])
 
   useEffect(() => {
     const node = stage.current
@@ -545,7 +649,7 @@ export function AssistOverlay({ index }: { index: number }) {
       const next = clamp(v.z * (e.deltaY < 0 ? ZOOM : 1 / ZOOM), 0.4, 8)
       const k = next / v.z
       zoomAim.current = {
-        i: indexRef.current,
+        i: shownRef.current,
         z: next,
         x: cx - (cx - v.x) * k,
         y: cy - (cy - v.y) * k,
@@ -555,7 +659,7 @@ export function AssistOverlay({ index }: { index: number }) {
     return () => node.removeEventListener('wheel', onWheel)
   }, [])
 
-  const begin = (kind: 'move' | 'pan' | 'resize', e: PointerEvent<HTMLElement>) => {
+  const begin = (kind: 'move' | 'pan' | 'resize', e: PointerEvent<HTMLElement>, fromTab = false) => {
     e.preventDefault()
     e.stopPropagation()
     e.currentTarget.setPointerCapture(e.pointerId)
@@ -570,6 +674,7 @@ export function AssistOverlay({ index }: { index: number }) {
       t: performance.now(),
       moved: false,
       docked: !!p.dock,
+      fromTab,
     }
   }
 
@@ -594,8 +699,8 @@ export function AssistOverlay({ index }: { index: number }) {
     begin('pan', e)
   }
 
-  const slide = SLIDES[index]
-  const n = String(index + 1).padStart(2, '0')
+  const slide = SLIDES[shownIndex]
+  const n = String(shownIndex + 1).padStart(2, '0')
 
   return (
     <aside
@@ -630,13 +735,10 @@ export function AssistOverlay({ index }: { index: number }) {
         type="button"
         className="assist-tab"
         data-dock={dock ?? ''}
-        aria-label="Show assist canvas"
+        aria-label={start.dock ? 'Show assist canvas' : 'Hide assist canvas'}
         aria-hidden={!dock}
         tabIndex={dock ? 0 : -1}
-        onPointerDown={(e) => {
-          if (!peekSide(pose.current)) return
-          begin('move', e)
-        }}
+        onPointerDown={(e) => begin('move', e, true)}
       >
         {n}
       </button>
