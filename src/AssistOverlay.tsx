@@ -42,6 +42,12 @@ function hitPhoto(grid: HTMLElement, x: number, y: number) {
   return null
 }
 
+function pickPhoto(grid: HTMLElement, img: HTMLImageElement | null) {
+  const many = grid.querySelectorAll('img').length > 1
+  grid.classList.toggle('is-picking', !!img && many)
+  for (const el of grid.querySelectorAll('img')) el.classList.toggle('is-selected', el === img)
+}
+
 function photoBox(img: HTMLImageElement) {
   const r = img.getBoundingClientRect()
   const nw = img.naturalWidth
@@ -225,10 +231,16 @@ function pickDock(x: number, y: number, w: number, h: number, vx: number, vy: nu
 }
 
 const HIDE = 'harness-assist-hide'
+const TOGGLE = 'harness-assist-toggle'
 
 /** Park the on-screen canvas (no-op if already docked). Peek-tab click still uses the same path. */
 export function hideAssistOverlay() {
   window.dispatchEvent(new Event(HIDE))
+}
+
+/** Tuck if expanded; expand to home if parked / peek-only / mid-tuck. */
+export function toggleAssistOverlay() {
+  window.dispatchEvent(new Event(TOGGLE))
 }
 
 export function AssistOverlay({ index }: { index: number }) {
@@ -464,6 +476,26 @@ export function AssistOverlay({ index }: { index: number }) {
       save(p)
       paint()
     }
+    const expand = () => {
+      const p = pose.current
+      if (!p.dock && !p.pending) return
+      hidePeek.current = false
+      parkAim.current = null
+      p.dock = null
+      p.pending = null
+      p.restore = false
+      p.x = p.home.x
+      p.y = p.home.y
+      p.vx = 0
+      p.vy = 0
+      save(p)
+      paint()
+    }
+    const onToggle = () => {
+      const p = pose.current
+      if (p.dock || p.pending) expand()
+      else tuck()
+    }
     const onUp = (e: globalThis.PointerEvent) => {
       pointers.current.delete(e.pointerId)
       if (pinch.current) {
@@ -516,12 +548,13 @@ export function AssistOverlay({ index }: { index: number }) {
         const node = stage.current
         const grid = sheet.current
         const img = grid && hitPhoto(grid, e.clientX, e.clientY)
-        if (node && img) {
+        if (node && grid && img) {
           const box = node.getBoundingClientRect()
           const painted = viewOf()
           const fit = fitPhoto(img, box, painted)
           const next = nearView(aimOf(), fit) ? GRID : fit
           zoomAim.current = { i: shownRef.current, ...next }
+          pickPhoto(grid, next === GRID ? null : img)
         }
       }
       drag.current = null
@@ -617,6 +650,7 @@ export function AssistOverlay({ index }: { index: number }) {
     window.addEventListener('pointerup', onUp)
     window.addEventListener('pointercancel', onUp)
     window.addEventListener(HIDE, tuck)
+    window.addEventListener(TOGGLE, onToggle)
     window.addEventListener('keydown', onKey)
     return () => {
       cancelAnimationFrame(raf)
@@ -625,6 +659,7 @@ export function AssistOverlay({ index }: { index: number }) {
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', onUp)
       window.removeEventListener(HIDE, tuck)
+      window.removeEventListener(TOGGLE, onToggle)
       window.removeEventListener('keydown', onKey)
     }
   }, [])
@@ -632,6 +667,11 @@ export function AssistOverlay({ index }: { index: number }) {
   useEffect(() => {
     paint()
   }, [shownIndex, srcKey, dock])
+
+  useEffect(() => {
+    const grid = sheet.current
+    if (grid) pickPhoto(grid, null)
+  }, [shownIndex, srcKey])
 
   useEffect(() => {
     if (pose.current.dock) setShownIndex(index)

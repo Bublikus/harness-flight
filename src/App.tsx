@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AssistOverlay, hideAssistOverlay } from './AssistOverlay'
+import { AssistOverlay, hideAssistOverlay, toggleAssistOverlay } from './AssistOverlay'
 import { CameraDock, Hud, SettingsDock, SoundDock, TitleScreen } from './Hud'
 import { activeCameraView, CAMERA_VIEWS, cycleCameraView } from './scene/cameraViews'
 import { World } from './scene/World'
@@ -33,7 +33,7 @@ export default function App() {
   const [approaching, setApproaching] = useState(false)
   const [turnDirection, setTurnDirection] = useState<TurnDirection>(0)
   const [facing, setFacing] = useState<1 | -1>(1)
-  /** Session toggle: boards stay sunk across hops until H again. */
+  /** Session toggle: boards stay sunk across hops until S again. */
   const [slidesHidden, setSlidesHidden] = useState(false)
   const [muted, setMuted] = useState(readMuted)
   const [volume, setVol] = useState(readVolume)
@@ -105,10 +105,15 @@ export default function App() {
         e.preventDefault()
         openSpeakerNotes()
       }
-      if (e.code === 'KeyH') {
+      if (e.code === 'KeyS') {
         if (typing || !started) return
         e.preventDefault()
         setSlidesHidden((hidden) => !hidden)
+      }
+      if (e.code === 'KeyA') {
+        if (e.repeat || typing || !started || atLast) return
+        e.preventDefault()
+        toggleAssistOverlay()
       }
       if (e.code === 'KeyM') {
         if (typing) return
@@ -118,7 +123,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [started, downTarget, flyForward, go, turnBack, startTalk, flipMute])
+  }, [started, atLast, downTarget, flyForward, go, turnBack, startTalk, flipMute])
 
   return (
     <div className="app">
