@@ -41,7 +41,9 @@ export function assistCols(n: number) {
 export function assistSrcs(index: number) {
   const urls = Object.entries(files)
     .filter(([path]) => slideOf(fileName(path)) === index)
-    .sort(([a], [b]) => fileName(a).localeCompare(fileName(b)))
+    .sort(([a], [b]) =>
+      fileName(a).localeCompare(fileName(b), undefined, { numeric: true, sensitivity: 'base' }),
+    )
     .map(([, url]) => url)
   return urls.length ? urls : [placeholder(index)]
 }

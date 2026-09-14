@@ -701,6 +701,8 @@ export function AssistOverlay({ index }: { index: number }) {
 
   const slide = SLIDES[shownIndex]
   const n = String(shownIndex + 1).padStart(2, '0')
+  const cols = assistCols(srcs.length)
+  const leftover = srcs.length % cols
 
   return (
     <aside
@@ -722,11 +724,18 @@ export function AssistOverlay({ index }: { index: number }) {
           ref={sheet}
           className="assist-grid"
           data-n={srcs.length}
-          data-cols={assistCols(srcs.length)}
+          data-cols={cols}
         >
-          {srcs.map((src) => (
+          {(leftover ? srcs.slice(0, -leftover) : srcs).map((src) => (
             <img key={src} src={src} alt="" draggable={false} />
           ))}
+          {leftover > 0 && (
+            <div className="assist-last-row">
+              {srcs.slice(-leftover).map((src) => (
+                <img key={src} src={src} alt="" draggable={false} />
+              ))}
+            </div>
+          )}
         </div>
       </div>
       <div className="assist-resize" onPointerDown={(e) => begin('resize', e)} />
