@@ -1,6 +1,6 @@
 # ADR-0033: Sky finale after last slide
 
-- Status: Accepted
+- Status: Superseded by ADR-0039
 - Date: 2026-09-12
 - Deciders: this session
 

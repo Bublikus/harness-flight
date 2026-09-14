@@ -174,12 +174,11 @@ export function World({
         facing={facing}
         hidden={slideHidden}
       />
-      <Fireworks active={finale && !flying} />
+      <Fireworks active={finale} />
       <Flight
         index={index}
         flying={flying}
         facing={facing}
-        finale={finale}
         turnDirection={turnDirection}
         onApproach={onApproach}
         onArrived={onArrived}

@@ -1,4 +1,4 @@
-import { FINALE, FINALE_PAGE, SLIDES } from './slides'
+import { LAST_CHECKPOINT, SLIDES } from './slides'
 
 export function Hud({
   index,
@@ -23,7 +23,7 @@ export function Hud({
   onTurnRight: () => void
   onSelect: (i: number) => void
 }) {
-  const finale = index === FINALE_PAGE
+  const finale = index === LAST_CHECKPOINT
   return (
     <div className="hud">
       <header className="topbar chrome">
@@ -39,8 +39,8 @@ export function Hud({
 
       <div className="hud-bottom chrome">
         <FlightPad
-          upDisabled={upTarget < 0 || upTarget > FINALE_PAGE}
-          downDisabled={downTarget < 0 || downTarget > FINALE_PAGE}
+          upDisabled={upTarget < 0 || upTarget > LAST_CHECKPOINT}
+          downDisabled={downTarget < 0 || downTarget > LAST_CHECKPOINT}
           turnDisabled={!canTurnBack}
           onUp={onUp}
           onDown={onDown}
@@ -48,24 +48,30 @@ export function Hud({
           onTurnRight={onTurnRight}
         />
         <div className="dots" role="navigation" aria-label="Waypoints">
-          {SLIDES.map((sl, i) => (
-            <button
-              key={sl.id}
-              type="button"
-              className={i === index ? 'dot on' : i < index ? 'dot done' : 'dot'}
-              aria-label={`Fly to waypoint ${i + 1}`}
-              aria-current={i === index ? 'step' : undefined}
-              onClick={() => onSelect(i)}
-            />
-          ))}
-          <button
-            key={FINALE.id}
-            type="button"
-            className={finale ? 'dot sky on' : 'dot sky'}
-            aria-label="Sky finale"
-            aria-current={finale ? 'step' : undefined}
-            onClick={() => onSelect(FINALE_PAGE)}
-          />
+          {SLIDES.map((sl, i) => {
+            const last = i === LAST_CHECKPOINT
+            const on = i === index
+            return (
+              <button
+                key={sl.id}
+                type="button"
+                className={
+                  last
+                    ? on
+                      ? 'dot sky on'
+                      : 'dot sky'
+                    : on
+                      ? 'dot on'
+                      : i < index
+                        ? 'dot done'
+                        : 'dot'
+                }
+                aria-label={last ? 'Sky finale' : `Fly to waypoint ${i + 1}`}
+                aria-current={on ? 'step' : undefined}
+                onClick={() => onSelect(i)}
+              />
+            )
+          })}
         </div>
       </div>
     </div>

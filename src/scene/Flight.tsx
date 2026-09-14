@@ -9,6 +9,7 @@ import {
   waypointPose,
   waypointPos,
 } from './route'
+import { LAST_CHECKPOINT } from '../slides'
 import { setFlightMix, syncAudioListener } from './FlightAudio'
 import { audioListenerPose, planePose } from './worldPoses'
 import { activeCameraView, CAMERA_VIEWS, VIEW_NUMS } from './cameraViews'
@@ -283,7 +284,6 @@ export function Flight({
   index,
   flying,
   facing,
-  finale,
   turnDirection,
   onApproach,
   onArrived,
@@ -291,7 +291,6 @@ export function Flight({
   index: number
   flying: boolean
   facing: 1 | -1
-  finale: boolean
   turnDirection: TurnDirection
   onApproach: () => void
   onArrived: () => void
@@ -559,12 +558,14 @@ export function Flight({
       bankZ.current += (bank - bankZ.current) * (1 - Math.exp(-d * 6))
       pitchX.current += (pitch - pitchX.current) * (1 - Math.exp(-d * 5))
 
-      if (
-        g.position.distanceTo(dest) < DOCK_RADIUS &&
-        speed.current < DOCK_SPEED &&
-        facingPark &&
-        !arrived.current
-      ) {
+      const atLast = index === LAST_CHECKPOINT
+      const onPad =
+        g.position.distanceTo(dest) < (atLast ? 0.8 : DOCK_RADIUS) &&
+        speed.current < (atLast ? 1.5 : DOCK_SPEED)
+      const landed = atLast
+        ? onPad || (!!b && bridgeU >= 1)
+        : onPad && facingPark
+      if (landed && !arrived.current) {
         arrived.current = true
         parkedAt.current = state.clock.elapsedTime
         onArrived()
@@ -640,7 +641,8 @@ export function Flight({
     const orbitEase = 1 - Math.exp(-d * ORBIT_LERP)
     orbit.current.x += (orbitTarget.current.x - orbit.current.x) * orbitEase
     orbit.current.y += (orbitTarget.current.y - orbit.current.y) * orbitEase
-    const skyAim = finale && !flying ? 1 : 0
+    const skyAim =
+      index === LAST_CHECKPOINT && (!flying || arrived.current) ? 1 : 0
     skyBlend.current +=
       (skyAim - skyBlend.current) * (1 - Math.exp(-d * 1.55))
 

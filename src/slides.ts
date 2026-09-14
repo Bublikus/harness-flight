@@ -156,25 +156,7 @@ export const SLIDES: Slide[] = [
   },
 ]
 
-/** Last talk checkpoint — same pose as the extra sky-finale page. */
+/** Last route pose — fireworks look-up after park; no talk board or assist. */
 export const LAST_CHECKPOINT = SLIDES.length - 1
-/** Extra pagination index after the last slide; not a 13th hop. */
-export const FINALE_PAGE = SLIDES.length
-
-export function waypointIndex(page: number) {
-  return Math.min(page, LAST_CHECKPOINT)
-}
-
-export const FINALE: Slide = {
-  id: 'finale',
-  era: 'End',
-  title: 'Your move',
-  lead: 'The plane is the `agent`. You still pick the *route*.',
-  points: ['`/ship`. Questions.'],
-  speakerNotes: [
-    'Hold for questions. The ask remains one real ticket through /ship.',
-    'If energy is high, invite the first owner and the first retrospective date.',
-  ],
-}
 
 export const WAYPOINT_SPACING = 58

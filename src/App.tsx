@@ -14,7 +14,7 @@ import {
   unlockAudio,
 } from './scene/FlightAudio'
 import { readMotionBlur, writeMotionBlur } from './scene/graphicsPrefs'
-import { FINALE_PAGE, LAST_CHECKPOINT, waypointIndex } from './slides'
+import { LAST_CHECKPOINT } from './slides'
 import { usePresentationSync } from './presentationSync'
 import './index.css'
 
@@ -33,54 +33,36 @@ export default function App() {
   const [approaching, setApproaching] = useState(false)
   const [turnDirection, setTurnDirection] = useState<TurnDirection>(0)
   const [facing, setFacing] = useState<1 | -1>(1)
-  const [pendingFinale, setPendingFinale] = useState(false)
   /** Session toggle: boards stay sunk across hops until H again. */
   const [slidesHidden, setSlidesHidden] = useState(false)
   const [muted, setMuted] = useState(readMuted)
   const [volume, setVol] = useState(readVolume)
   const [motionBlur, setMotionBlur] = useState(readMotionBlur)
   const [camView, setCamView] = useState(activeCameraView.index)
-  const finale = index === FINALE_PAGE
-  const waypoint = waypointIndex(index)
-  const upTarget = finale ? FINALE_PAGE + 1 : index + facing
-  const rawDown = finale ? LAST_CHECKPOINT : index - facing
-  const downTarget = !finale && rawDown === FINALE_PAGE ? -1 : rawDown
+  const atLast = index === LAST_CHECKPOINT
+  /** Fireworks + look-up: parked at waypoint 12, not merely hopping toward it. */
+  const finale = atLast && !flying
+  const upTarget = atLast ? LAST_CHECKPOINT + 1 : index + facing
+  const downTarget = atLast ? LAST_CHECKPOINT - 1 : index - facing
 
   const go = useCallback((next: number, turn: TurnDirection = 0) => {
-    if (next < 0 || next > FINALE_PAGE) return
-    if (next === index) {
-      setPendingFinale(false)
-      return
-    }
+    if (next < 0 || next > LAST_CHECKPOINT) return
+    if (next === index) return
     hideAssistOverlay()
-    const fromWp = waypointIndex(index)
-    const toWp = waypointIndex(next)
-    if (fromWp === toWp) {
-      if (flying && next === FINALE_PAGE) {
-        setPendingFinale(true)
-        return
-      }
-      if (flying) return
-      setPendingFinale(false)
-      setBackIndex(index)
-      setIndex(next)
-      return
-    }
     unlockAudio()
     setFlying(true)
     setApproaching(false)
     setTurnDirection(turn)
-    setPendingFinale(next === FINALE_PAGE)
-    if ((toWp - fromWp) * facing < 0)
+    if ((next - index) * facing < 0)
       setFacing(facing === 1 ? -1 : 1)
-    setBackIndex(fromWp)
-    setIndex(toWp)
-  }, [facing, flying, index])
+    setBackIndex(index)
+    setIndex(next)
+  }, [facing, index])
 
   const flyForward = useCallback(() => {
-    if (index === FINALE_PAGE) return
+    if (atLast) return
     go(upTarget)
-  }, [go, index, upTarget])
+  }, [atLast, go, upTarget])
 
   const startTalk = useCallback(() => {
     unlockAudio()
@@ -88,7 +70,7 @@ export default function App() {
     setStarted(true)
   }, [])
 
-  usePresentationSync(waypoint, (next) => {
+  usePresentationSync(index, (next) => {
     setStarted(true)
     if (next !== index) go(next)
   })
@@ -141,23 +123,19 @@ export default function App() {
   return (
     <div className="app">
       <World
-        index={waypoint}
+        index={index}
         started={started}
         flying={flying}
         approaching={approaching}
         facing={facing}
         finale={finale}
-        slideHidden={slidesHidden || finale || pendingFinale}
+        slideHidden={slidesHidden || atLast}
         turnDirection={turnDirection}
         motionBlur={motionBlur}
         onApproach={() => setApproaching(true)}
         onArrived={() => {
           setFlying(false)
           setApproaching(false)
-          if (pendingFinale) {
-            setPendingFinale(false)
-            setIndex(FINALE_PAGE)
-          }
         }}
       />
       {started ? (
@@ -174,7 +152,7 @@ export default function App() {
             onTurnRight={() => turnBack(-1)}
             onSelect={go}
           />
-          <AssistOverlay index={waypoint} />
+          {!atLast && <AssistOverlay index={index} />}
         </>
       ) : (
         <TitleScreen onStart={startTalk} />

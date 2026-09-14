@@ -36,12 +36,13 @@ Index of lasting presentation choices. Procedure: `adr` skill.
 | [0030](0030-full-world-mobile-runtime-opts.md) | Full world with mobile runtime opts (chunk stream + cheaper GPU) | Accepted |
 | [0031](0031-desktop-postprocessing-motion-blur.md) | Desktop EffectComposer motion blur scaled by plane speed | Accepted |
 | [0032](0032-persistent-h-hide-slides.md) | Persistent H-hide across waypoints | Accepted |
-| [0033](0033-sky-finale-after-last-slide.md) | Sky finale after last slide | Accepted |
+| [0033](0033-sky-finale-after-last-slide.md) | Sky finale after last slide | Superseded by ADR-0039 |
 | [0034](0034-hermite-arrival-bridge.md) | Hermite arrival bridge | Accepted |
 | [0035](0035-sharp-plane-over-motion-blur.md) | Sharp plane over desktop motion blur | Accepted |
 | [0036](0036-cyclable-camera-view-configs.md) | Cyclable camera views as smoothed config objects | Accepted |
 | [0037](0037-spatial-web-audio-world-sfx.md) | Spatial Web Audio for world SFX | Accepted |
 | [0038](0038-hop-parks-assist-overlay.md) | Hop parks the assist overlay | Accepted |
+| [0039](0039-last-waypoint-is-fireworks.md) | Last waypoint is the fireworks finale | Accepted |
 
 Restore a talk version with `git log --oneline` then `git checkout <commit>`:
 

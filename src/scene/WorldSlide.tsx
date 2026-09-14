@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { getSlideArt } from '../SlideArt'
 import { lines } from '../slideMarkup'
-import { SLIDES, type Slide } from '../slides'
+import { LAST_CHECKPOINT, SLIDES, type Slide } from '../slides'
 import { waypointPose } from './route'
 import { blockMaterials } from './blockTextures'
 import { playRiseWhoosh } from './FlightAudio'
@@ -187,7 +187,7 @@ function WorldSlideCard({
   const { gl, viewport } = useThree()
   const slide = SLIDES[index]
   const pose = useMemo(() => routePose(index, facing), [index, facing])
-  const raised = active && started && (!flying || approaching) && !hidden
+  const raised = active && started && (!flying || approaching) && !hidden && index < LAST_CHECKPOINT
   const frame = useMemo(() => blockMaterials('plank', [WIDTH + 0.5, HEIGHT + 0.5, 0.34]), [])
   const { canvas, texture } = useMemo(() => {
     const canvas = document.createElement('canvas')
@@ -338,18 +338,21 @@ export function WorldSlide({
   facing: 1 | -1
   hidden: boolean
 }) {
-  const current = boardId(index)
+  const talk = index < LAST_CHECKPOINT
+  const current = talk ? boardId(index) : ''
   const [state, setState] = useState(() => ({
     current,
     cards: [{ index, facing }],
   }))
-  const hasFace = state.cards.some(
-    (card) => boardId(card.index) === current && card.facing === facing,
-  )
-  if (state.current !== current || !hasFace)
+  const hasFace =
+    talk &&
+    state.cards.some(
+      (card) => boardId(card.index) === current && card.facing === facing,
+    )
+  if (state.current !== current || (talk && !hasFace))
     setState({
       current,
-      cards: hasFace ? state.cards : [...state.cards, { index, facing }],
+      cards: hasFace ? state.cards : talk ? [...state.cards, { index, facing }] : state.cards,
     })
 
   const remove = useCallback((exited: string) => {
@@ -368,7 +371,7 @@ export function WorldSlide({
       flying={flying}
       approaching={approaching}
       hidden={hidden}
-      active={boardId(card.index) === current && card.facing === facing}
+      active={talk && boardId(card.index) === current && card.facing === facing}
       onExited={() => remove(cardKey(card.index, card.facing))}
     />
   ))
